@@ -9,6 +9,11 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.speech.tts.TextToSpeech
 import java.util.Locale
+import android.content.Context
+import android.os.Vibrator
+import android.os.VibrationEffect
+import android.os.VibratorManager
+import android.os.Build
 
 class MainActivity : AppCompatActivity() {
     private var tts: TextToSpeech? = null
@@ -52,8 +57,9 @@ class MainActivity : AppCompatActivity() {
             Log.d("Button", "Green button tapped")
         }
         play_btn.setOnLongClickListener { // long press (about 500ms)
-            Log.d("Button", "Green button held")
             // TODO: add long press functionality
+            Log.d("Button", "Green button held")
+            vibrate()
             true
         }
 
@@ -66,8 +72,17 @@ class MainActivity : AppCompatActivity() {
             Log.d("Button", "Red button tapped")
         }
         title_btn.setOnLongClickListener { // long press (about 500ms)
+            // TODO: add long press functionality
             Log.d("Button", "Red button held")
-            speak("זאת בדיקה של השמעת הכפתורים")
+            vibrate()
+            speak("כפתור ירוק: הקשה קצרה תתחיל ותפסיק את השמע.")
+            speak("כפתור ירוק: הקשה ארוכה תסמן את השמע כ'הושלם'.")
+            speak("כפתור אדום: הקשה קצרה תשמיע את הכותרת.")
+            speak("כפתור אדום: הקשה ארוכה תקריא את כל הכפתורים.")
+            speak("כפתור כחול: הקשה תדלג עשר שניות קדימה.")
+            speak("כפתור צהוב: הקשה תחזור עשר שניות אחורה.")
+            speak("כפתור לבן: הקשה תחזור לשמע הקודם.")
+            speak("כפתור סגול: הקשה תעבור לשמע הבא.")
             true
         }
 
@@ -78,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         forward_btn.setOnClickListener {
             // TODO: add tap functionality
             Log.d("Button", "Blue button tapped")
+            vibrate()
         }
 
 
@@ -87,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         rewind_btn.setOnClickListener {
             // TODO: add tap functionality
             Log.d("Button", "Yellow button tapped")
+            vibrate()
         }
 
 
@@ -96,6 +113,7 @@ class MainActivity : AppCompatActivity() {
         next_btn.setOnClickListener {
             // TODO: add tap functionality
             Log.d("Button", "Purple button tapped")
+            vibrate()
         }
 
 
@@ -105,20 +123,37 @@ class MainActivity : AppCompatActivity() {
         previous_btn.setOnClickListener {
             // TODO: add tap functionality
             Log.d("Button", "White button tapped")
+            vibrate()
         }
     }
 
     // TTS function
     private fun speak(text: String) {
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "")
+        tts?.speak(text, TextToSpeech.QUEUE_ADD, null, "")
     }
 
-    // TTS cleanup when app stops
+    // TTS cleanup function when app stops
     override fun onDestroy() {
         if (tts != null) {
             tts?.stop()
             tts?.shutdown()
         }
         super.onDestroy()
+    }
+
+    // Function that increases the heptic feedback
+    private fun vibrate() {
+        // Gets the vibrator service
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator }
+        else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
+
+        // Create an effect: (Duration in ms, Amplitude 1-255)
+        // 255 is the maximum strength the phone's motor can handle.
+        val effect = VibrationEffect.createOneShot(150, 255)
+        vibrator.vibrate(effect)
     }
 }
