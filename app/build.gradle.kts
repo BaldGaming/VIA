@@ -36,6 +36,8 @@ android {
 }
 
 dependencies {
+    implementation("androidx.media3:media3-exoplayer:1.2.1") // media player shit
+    implementation("androidx.media3:media3-ui:1.2.1") // media player shit
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
