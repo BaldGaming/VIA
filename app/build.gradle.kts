@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.hia"
+    namespace = "com.example.via"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -11,7 +11,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.hia"
+        applicationId = "com.example.via"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

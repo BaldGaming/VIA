@@ -1,4 +1,4 @@
-package com.example.hia
+package com.example.via
 
 import android.os.Bundle
 import android.util.Log

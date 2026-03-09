@@ -1,4 +1,4 @@
-package com.example.hia
+package com.example.via
 
 import org.junit.Test
 
