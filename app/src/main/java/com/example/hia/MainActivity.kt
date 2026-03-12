@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity() {
     private val previous_audio_stack = mutableListOf<Int>()
 
     // The current queue (B)
-    private val audio_queue = mutableListOf(R.raw.test1, R.raw.test2, R.raw.test3)
+    private val audio_queue = mutableListOf(R.raw.i_need_a_hero, R.raw.illegal, R.raw.israel_anthem)
     private var current_audio_index = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,25 +72,26 @@ class MainActivity : AppCompatActivity() {
         play_btn.setOnClickListener { // tap
             Log.d("Button", "Green button tapped")
             vibrate()
+
+            // Stops the TTS if it's running
+            tts?.stop()
+
             val current_player = media_player
 
             // If playing, pause it and save position
-            if (current_player != null && current_player.isPlaying)
-            {
+            if (current_player != null && current_player.isPlaying) {
                 pause_audio()
                 Log.d("Audio", "Audio paused")
             }
 
             // If already exists but paused, just resume
-            else if (current_player != null && !current_player.isPlaying)
-            {
+            else if (current_player != null && !current_player.isPlaying) {
                 current_player.start()
                 Log.d("Audio", "Resumed audio")
             }
 
             // If no player exists at all, create and play
-            else
-            {
+            else {
                 play_audio(audio_queue[current_audio_index])
                 Log.d("Audio", "Audio started")
             }
@@ -99,23 +100,35 @@ class MainActivity : AppCompatActivity() {
             // TODO: add long press functionality that marks the audio file as "heard"
             Log.d("Button", "Green button held")
             vibrate()
+
+            // Stops the TTS if it's running
+            tts?.stop()
+
             true
         }
 
-        
+
         /**
          * Title logic
          */
         title_btn.setOnClickListener { // tap
-            // TODO: add tap functionality that reads the title of the audio file
             Log.d("Button", "Red button tapped")
             vibrate()
+
+            // Stops the TTS if it's running
+            tts?.stop()
+
+            speak("שם הקובץ הינו")
+            title_read()
         }
 
         title_btn.setOnLongClickListener { // long press (about 500ms)
-            // TODO: add long press functionality
             Log.d("Button", "Red button held")
             vibrate()
+
+            // Stops the TTS if it's running
+            tts?.stop()
+
             speak("כפתור ירוק: הקשה קצרה תתחיל ותפסיק את השמע.")
             speak("כפתור ירוק: הקשה ארוכה תסמן את השמע כ'הושלם'.")
             speak("כפתור אדום: הקשה קצרה תשמיע את הכותרת.")
@@ -162,6 +175,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        rewind_btn.setOnLongClickListener {
+            Log.d("Button", "Yellow button held")
+            vibrate()
+
+            media_player?.let { player ->
+                // Shifts the current position to the start
+                player.seekTo(0)
+
+                // Updates the SharedPreferences to reflect this
+                val audio_id = audio_queue[current_audio_index]
+                prefs.edit().putInt("last_pos_$audio_id", 0).apply()
+            }
+            true
+        }
+
 
         /**
          * Next logic
@@ -170,11 +198,32 @@ class MainActivity : AppCompatActivity() {
             Log.d("Button", "Purple button tapped")
             vibrate()
 
-            // Saves the current audio file to the stack before leaving it
-            previous_audio_stack.add(audio_queue[current_audio_index])
+            // Stops the TTS if it's running
+            tts?.stop()
 
-            // Increments index, but loop back to 0 if we hit the end
-            current_audio_index = (current_audio_index + 1) % audio_queue.size
+            // Checks if we are not at last audio file
+            if (current_audio_index < audio_queue.size - 1) {
+
+                // Save progress and pause the current audio before switching
+                pause_audio()
+
+                // Saves the current audio file to the stack before leaving it
+                previous_audio_stack.add(audio_queue[current_audio_index])
+
+                // Increments index by 1
+                current_audio_index++
+
+                // Ejects the old audio file
+                media_player?.release()
+                media_player = null
+
+                speak("שם הקובץ הינו")
+                title_read()
+
+            } else {
+                speak("הגעת לסוף הרשימה")
+                Log.d("Audio", "End of playlist reached")
+            }
         }
 
 
@@ -184,17 +233,41 @@ class MainActivity : AppCompatActivity() {
         previous_btn.setOnClickListener {
             Log.d("Button", "White button tapped")
             vibrate()
-            play_previous()
+
+            // Stops the TTS if it's running
+            tts?.stop()
+
+            // Checks if we are not at last audio file
+            if (current_audio_index > 0) {
+                previous()
+                speak("שם הקובץ הינו")
+                title_read()
+            } else {
+                speak("הגעת לתחילת הרשימה")
+                Log.d("Audio", "Start of playlist reached")
+            }
         }
     }
 
     // TTS function
-    private fun speak(text: String) {
+    private fun speak(text: String, id: String = "") {
         // Stops the audio file before talking so the user can hear the instructions
         if (media_player?.isPlaying == true)
             pause_audio()
 
-        tts?.speak(text, TextToSpeech.QUEUE_ADD, null, "")
+        tts?.speak(text, TextToSpeech.QUEUE_ADD, null, id)
+    }
+
+    // Function that reads the title of the current audio file
+    private fun title_read(id: String = "") {
+        // Gets the current ID number
+        val current_id = audio_queue[current_audio_index]
+
+        // Translates the ID into a raw file name
+        val file_name = resources.getResourceEntryName(current_id)
+
+        // Reads the file name
+        speak(file_name, id)
     }
 
     // TTS cleanup function when app stops
@@ -210,11 +283,13 @@ class MainActivity : AppCompatActivity() {
     private fun vibrate() {
         // Gets the vibrator service
         val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator }
-        else {
+            val vibratorManager =
+                getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
             @Suppress("DEPRECATION")
-            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
+            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
 
         // Create an effect: (Duration in ms, Amplitude 1-255)
         val effect = VibrationEffect.createOneShot(150, 255)
@@ -250,8 +325,11 @@ class MainActivity : AppCompatActivity() {
                 val raw_position = player.currentPosition
 
                 // Subtract 3 seconds
-                val adjusted_position = if (raw_position > 3000) {raw_position - 3000}
-                else {0}
+                val adjusted_position = if (raw_position > 3000) {
+                    raw_position - 3000
+                } else {
+                    0
+                }
 
                 // Save position to SharedPreferences
                 prefs.edit().putInt("last_pos_$audio_id", adjusted_position).apply()
@@ -264,15 +342,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function that handles going back to previous audio.
-    private fun play_previous() {
+    private fun previous() {
         // Checks if the previous stack not empty
         if (previous_audio_stack.isNotEmpty()) {
+
+            //
+            pause_audio()
 
             // Pulls newest audio file from the stack and decrements the size of the stack by 1
             val last_id = previous_audio_stack.removeAt(previous_audio_stack.size - 1)
 
             // Sets the current index to be the previous file
             current_audio_index = audio_queue.indexOf(last_id)
+
+            // Ejects the old audio file
+            media_player?.release()
+            media_player = null
         }
     }
 
