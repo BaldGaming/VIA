@@ -18,10 +18,10 @@ import android.media.MediaPlayer
 import android.content.SharedPreferences
 
 class MainActivity : AppCompatActivity() {
-    // TTS
+    // TTS memory
     private var tts: TextToSpeech? = null
 
-    // Media player & Shared preferences
+    // Media player & Shared preferences memory
     private var media_player: MediaPlayer? = null
     private lateinit var prefs: SharedPreferences
 
@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
+        // Opens the app's private save file ("via_prefs") to remember things like audio timestamps
         prefs = getSharedPreferences("via_prefs", Context.MODE_PRIVATE)
 
         // Initializes the TTS engine
@@ -69,6 +70,7 @@ class MainActivity : AppCompatActivity() {
          * Play logic
          */
         play_btn.setOnClickListener { // tap
+            Log.d("Button", "Green button tapped")
             vibrate()
             val current_player = media_player
 
@@ -92,10 +94,9 @@ class MainActivity : AppCompatActivity() {
                 play_audio(audio_queue[current_audio_index])
                 Log.d("Audio", "Audio started")
             }
-            Log.d("Button", "Green button tapped")
         }
         play_btn.setOnLongClickListener { // long press (about 500ms)
-            // TODO: add long press functionality
+            // TODO: add long press functionality that marks the audio file as "heard"
             Log.d("Button", "Green button held")
             vibrate()
             true
@@ -106,9 +107,11 @@ class MainActivity : AppCompatActivity() {
          * Title logic
          */
         title_btn.setOnClickListener { // tap
-            // TODO: add tap functionality
+            // TODO: add tap functionality that reads the title of the audio file
             Log.d("Button", "Red button tapped")
+            vibrate()
         }
+
         title_btn.setOnLongClickListener { // long press (about 500ms)
             // TODO: add long press functionality
             Log.d("Button", "Red button held")
@@ -133,6 +136,7 @@ class MainActivity : AppCompatActivity() {
             vibrate()
 
             media_player?.let { player ->
+                // Shifts the current position forwards by 10 seconds
                 val new_pos = player.currentPosition + 10000
 
                 // Makes sure it doesn't seek past the end of the audio file
@@ -150,6 +154,7 @@ class MainActivity : AppCompatActivity() {
             Log.d("Button", "Yellow button tapped")
             vibrate()
 
+            // Shifts the current position backwards by 10 seconds
             media_player?.let { player ->
                 // Uses coerceAtLeast(0) to ensure we don't go negative
                 val new_pos = (player.currentPosition - 10000).coerceAtLeast(0)
@@ -212,7 +217,6 @@ class MainActivity : AppCompatActivity() {
             getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
 
         // Create an effect: (Duration in ms, Amplitude 1-255)
-        // 255 is the maximum strength the phone's motor can handle.
         val effect = VibrationEffect.createOneShot(150, 255)
         vibrator.vibrate(effect)
     }
@@ -227,6 +231,8 @@ class MainActivity : AppCompatActivity() {
 
         // Pulls saved time from SharedPreferences
         val saved_position = prefs.getInt("last_pos_$audio_res_id", 0)
+
+        // Seeks the audio to the saved time if it exists
         media_player?.seekTo(saved_position)
 
         // Starts audio
@@ -243,10 +249,9 @@ class MainActivity : AppCompatActivity() {
                 // Gets the current position
                 val raw_position = player.currentPosition
 
-                // Subtract 5 seconds
-                val adjusted_position = if (raw_position > 5000)
-                    raw_position - 5000
-                else 0
+                // Subtract 3 seconds
+                val adjusted_position = if (raw_position > 3000) {raw_position - 3000}
+                else {0}
 
                 // Save position to SharedPreferences
                 prefs.edit().putInt("last_pos_$audio_id", adjusted_position).apply()
@@ -260,19 +265,23 @@ class MainActivity : AppCompatActivity() {
 
     // Function that handles going back to previous audio.
     private fun play_previous() {
+        // Checks if the previous stack not empty
         if (previous_audio_stack.isNotEmpty()) {
 
-            // pulls from stack
+            // Pulls newest audio file from the stack and decrements the size of the stack by 1
             val last_id = previous_audio_stack.removeAt(previous_audio_stack.size - 1)
+
+            // Sets the current index to be the previous file
             current_audio_index = audio_queue.indexOf(last_id)
         }
     }
 
-    // TODO: put text here
+    // Function that gets triggered automatically by Android the
+    // exact moment the app is completely hidden from the user's screen.
     override fun onStop() {
         super.onStop()
 
         // Save progress whenever app is hidden
         pause_audio()
-    }
+    } // This function essentially acts as a guard against closing the app before pausing the audio file
 }
