@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity() {
     private val previous_audio_stack = mutableListOf<Int>()
 
     // The current queue (B)
-    private val audio_queue = mutableListOf<CloudSong>()
+    private val audio_queue = mutableListOf(R.raw.i_need_a_hero, R.raw.illegal, R.raw.israel_anthem)
     private var current_audio_index = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,18 +53,13 @@ class MainActivity : AppCompatActivity() {
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 // Sets language to Hebrew
-                val result = tts?.setLanguage(Locale.forLanguageTag("he"))
+                val result = tts?.setLanguage(Locale("he"))
 
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     Log.e("TTS", "TTS Error? *PLACEHOLDER*")
                 }
             }
         }
-
-        // Starts the cloud sync
-        fetch_audio_files()
-        Log.d("Audio", "Cloud sync started")
-
 
         // Buttons
         val play_btn = findViewById<Button>(R.id.button1) // Play\Pause\Marked as heard.
@@ -216,7 +211,7 @@ class MainActivity : AppCompatActivity() {
                 pause_audio()
 
                 // Saves the current audio file to the stack before leaving it
-                previous_audio_stack.add(current_audio_index)
+                previous_audio_stack.add(audio_queue[current_audio_index])
 
                 // Increments index by 1
                 current_audio_index++
@@ -268,9 +263,14 @@ class MainActivity : AppCompatActivity() {
 
     // Function that reads the title of the current audio file
     private fun title_read(id: String = "") {
+        // Gets the current ID number
+        val current_id = audio_queue[current_audio_index]
 
-        if (audio_queue.isNotEmpty())
-            speak(audio_queue[current_audio_index].title, id)
+        // Translates the ID into a raw file name
+        val file_name = resources.getResourceEntryName(current_id)
+
+        // Reads the file name
+        speak(file_name, id)
     }
 
     // TTS cleanup function when app stops
@@ -300,41 +300,47 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function that handles playing audio.
-    private fun play_audio(song: CloudSong) {
+    private fun play_audio(audio_res_id: Int) {
+        // Releases an old player if it exists
         media_player?.release()
 
-        // Creates the player manually for URLs
-        media_player = MediaPlayer().apply {
-            setDataSource(song.url)
+        // Initializes new player
+        media_player = MediaPlayer.create(this, audio_res_id)
 
-            // Cloud files need to buffer before they can play
-            prepareAsync()
+        // Pulls saved time from SharedPreferences
+        val saved_position = prefs.getInt("last_pos_$audio_res_id", 0)
 
-            setOnPreparedListener {
-                // Seek to saved position if it exists
-                val saved_pos = prefs.getInt("last_pos_${song.title}", 0)
-                seekTo(saved_pos)
-                start()
-                Log.d("Audio", "Playing: ${song.title}")
-            }
-        }
+        // Seeks the audio to the saved time if it exists
+        media_player?.seekTo(saved_position)
+
+        // Starts audio
+        media_player?.start()
     }
 
     // Function that handles pausing audio.
     private fun pause_audio() {
         media_player?.let { player ->
-            if (player.isPlaying && audio_queue.isNotEmpty()) {
-                val current_song = audio_queue[current_audio_index]
+            if (player.isPlaying) {
+                // Gets the audio id
+                val audio_id = audio_queue[current_audio_index]
+
+                // Gets the current position
                 val raw_position = player.currentPosition
 
-                // Your 3-second recovery logic
-                val adjusted_position = if (raw_position > 3000) raw_position - 3000 else 0
+                // Subtract 3 seconds
+                val adjusted_position = if (raw_position > 3000) {
+                    raw_position - 3000
+                } else {
+                    0
+                }
 
-                // Save using the title as the key
-                prefs.edit().putInt("last_pos_${current_song.title}", adjusted_position).apply()
+                // Save position and current index to SharedPreferences
+                prefs.edit().putInt("last_pos_$audio_id", adjusted_position).apply()
                 prefs.edit().putInt("last_active_index", current_audio_index).apply()
 
+                // Pauses
                 player.pause()
+                Log.d("Audio", "Paused at $raw_position, saved as $adjusted_position")
             }
         }
     }
@@ -343,11 +349,17 @@ class MainActivity : AppCompatActivity() {
     private fun previous() {
         // Checks if the previous stack not empty
         if (previous_audio_stack.isNotEmpty()) {
+
+            //
             pause_audio()
 
-            // Pulls the last index from the stack and updates index
-            current_audio_index = previous_audio_stack.removeAt(previous_audio_stack.size - 1)
+            // Pulls newest audio file from the stack and decrements the size of the stack by 1
+            val last_id = previous_audio_stack.removeAt(previous_audio_stack.size - 1)
 
+            // Sets the current index to be the previous file
+            current_audio_index = audio_queue.indexOf(last_id)
+
+            // Ejects the old audio file
             media_player?.release()
             media_player = null
         }
@@ -361,39 +373,4 @@ class MainActivity : AppCompatActivity() {
         // Save progress whenever app is hidden
         pause_audio()
     } // This function essentially acts as a guard against closing the app before pausing the audio file
-
-    // Function for fetching audio files from Firebase
-    private fun fetch_audio_files() {
-        val database = com.google.firebase.database.FirebaseDatabase.getInstance()
-        val myRef = database.getReference("audio_files")
-
-        // Listen for the data to arrive from the cloud
-        myRef.get().addOnSuccessListener { snapshot ->
-            // Clears the "Loading..." state
-            audio_queue.clear()
-
-            // Loops through everything Firebase sent back
-            for (song_snapshot in snapshot.children) {
-                val song = song_snapshot.getValue(CloudSong::class.java)
-                if (song != null) {
-                    audio_queue.add(song)
-                    Log.d("Firebase", "Loaded: ${song.title}")
-                }
-            }
-
-//            // Now that the queue is full, we can tell the user we're ready
-//            if (audio_queue.isNotEmpty()) {
-//                speak("הרשימה עודכנה. ישנם ${audio_queue.size} קבצים.")
-//            }
-
-        }.addOnFailureListener { // If something goes wrong...
-            Log.e("Firebase", "Error fetching songs", it)
-        }
-    }
 }
-
-// A data container for the Firebase audio files
-data class CloudSong(
-    val title: String = "",
-    val url: String = ""
-)
