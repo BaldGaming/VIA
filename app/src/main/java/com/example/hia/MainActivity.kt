@@ -22,15 +22,15 @@ class MainActivity : AppCompatActivity() {
     private var tts: TextToSpeech? = null
 
     // Media player & Shared preferences memory
-    private var media_player: MediaPlayer? = null
+    private var mediaPlayer: MediaPlayer? = null
     private lateinit var prefs: SharedPreferences
 
     // The stack for previous files (A)
-    private val previous_audio_stack = mutableListOf<Int>()
+    private val previousAudioStack = mutableListOf<Int>()
 
     // The current queue (B)
-    private val audio_queue = mutableListOf(R.raw.i_need_a_hero, R.raw.illegal, R.raw.israel_anthem)
-    private var current_audio_index = 0
+    private val audioQueue = mutableListOf(R.raw.i_need_a_hero, R.raw.illegal, R.raw.israel_anthem)
+    private var currentAudioIndex = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,7 +47,7 @@ class MainActivity : AppCompatActivity() {
         prefs = getSharedPreferences("via_prefs", Context.MODE_PRIVATE)
 
         // Loads the last saved audio file index if exists. Else, defaults to the first file.
-        current_audio_index = prefs.getInt("last_active_index", 0)
+        currentAudioIndex = prefs.getInt("last_active_index", 0)
 
         // Initializes the TTS engine
         tts = TextToSpeech(this) { status ->
@@ -62,44 +62,44 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Buttons
-        val play_btn = findViewById<Button>(R.id.button1) // Play\Pause\Marked as heard.
-        val title_btn = findViewById<Button>(R.id.button) // Title read\Buttons read.
-        val forward_btn = findViewById<Button>(R.id.button3) // Forward 10 seconds.
-        val rewind_btn = findViewById<Button>(R.id.button2) // Rewind 10 seconds.
-        val next_btn = findViewById<Button>(R.id.button5) // Next audio file.
-        val previous_btn = findViewById<Button>(R.id.button4) // Previous audio file.
+        val playBtn = findViewById<Button>(R.id.button1) // Play\Pause\Marked as heard.
+        val titleBtn = findViewById<Button>(R.id.button) // Title read\Buttons read.
+        val forwardBtn = findViewById<Button>(R.id.button3) // Forward 10 seconds.
+        val rewindBtn = findViewById<Button>(R.id.button2) // Rewind 10 seconds.
+        val nextBtn = findViewById<Button>(R.id.button5) // Next audio file.
+        val previousBtn = findViewById<Button>(R.id.button4) // Previous audio file.
 
         /**
          * Play logic
          */
-        play_btn.setOnClickListener { // tap
+        playBtn.setOnClickListener { // tap
             Log.d("Button", "Green button tapped")
             vibrate()
 
             // Stops the TTS if it's running
             tts?.stop()
 
-            val current_player = media_player
+            val currentPlayer = mediaPlayer
 
             // If playing, pause it and save position
-            if (current_player != null && current_player.isPlaying) {
-                pause_audio()
+            if (currentPlayer != null && currentPlayer.isPlaying) {
+                pauseAudio()
                 Log.d("Audio", "Audio paused")
             }
 
             // If already exists but paused, just resume
-            else if (current_player != null && !current_player.isPlaying) {
-                current_player.start()
+            else if (currentPlayer != null && !currentPlayer.isPlaying) {
+                currentPlayer.start()
                 Log.d("Audio", "Resumed audio")
             }
 
             // If no player exists at all, create and play
             else {
-                play_audio(audio_queue[current_audio_index])
+                playAudio(audioQueue[currentAudioIndex])
                 Log.d("Audio", "Audio started")
             }
         }
-        play_btn.setOnLongClickListener { // long press (about 500ms)
+        playBtn.setOnLongClickListener { // long press (about 500ms)
             // TODO: add long press functionality that marks the audio file as "heard"
             Log.d("Button", "Green button held")
             vibrate()
@@ -114,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         /**
          * Title logic
          */
-        title_btn.setOnClickListener { // tap
+        titleBtn.setOnClickListener { // tap
             Log.d("Button", "Red button tapped")
             vibrate()
 
@@ -122,10 +122,10 @@ class MainActivity : AppCompatActivity() {
             tts?.stop()
 
             speak("שם הקובץ הינו")
-            title_read()
+            titleRead()
         }
 
-        title_btn.setOnLongClickListener { // long press (about 500ms)
+        titleBtn.setOnLongClickListener { // long press (about 500ms)
             Log.d("Button", "Red button held")
             vibrate()
 
@@ -147,17 +147,17 @@ class MainActivity : AppCompatActivity() {
         /**
          * Forward logic
          */
-        forward_btn.setOnClickListener {
+        forwardBtn.setOnClickListener {
             Log.d("Button", "Blue button tapped")
             vibrate()
 
-            media_player?.let { player ->
+            mediaPlayer?.let { player ->
                 // Shifts the current position forwards by 10 seconds
-                val new_pos = player.currentPosition + 10000
+                val newPos = player.currentPosition + 10000
 
                 // Makes sure it doesn't seek past the end of the audio file
-                if (new_pos < player.duration) {
-                    player.seekTo(new_pos)
+                if (newPos < player.duration) {
+                    player.seekTo(newPos)
                 }
             }
         }
@@ -166,29 +166,29 @@ class MainActivity : AppCompatActivity() {
         /**
          * Rewind logic
          */
-        rewind_btn.setOnClickListener {
+        rewindBtn.setOnClickListener {
             Log.d("Button", "Yellow button tapped")
             vibrate()
 
             // Shifts the current position backwards by 10 seconds
-            media_player?.let { player ->
+            mediaPlayer?.let { player ->
                 // Uses coerceAtLeast(0) to ensure we don't go negative
-                val new_pos = (player.currentPosition - 10000).coerceAtLeast(0)
-                player.seekTo(new_pos)
+                val newPos = (player.currentPosition - 10000).coerceAtLeast(0)
+                player.seekTo(newPos)
             }
         }
 
-        rewind_btn.setOnLongClickListener {
+        rewindBtn.setOnLongClickListener {
             Log.d("Button", "Yellow button held")
             vibrate()
 
-            media_player?.let { player ->
+            mediaPlayer?.let { player ->
                 // Shifts the current position to the start
                 player.seekTo(0)
 
                 // Updates the SharedPreferences to reflect this
-                val audio_id = audio_queue[current_audio_index]
-                prefs.edit().putInt("last_pos_$audio_id", 0).apply()
+                val audioId = audioQueue[currentAudioIndex]
+                prefs.edit().putInt("last_pos_$audioId", 0).apply()
             }
             true
         }
@@ -197,7 +197,7 @@ class MainActivity : AppCompatActivity() {
         /**
          * Next logic
          */
-        next_btn.setOnClickListener {
+        nextBtn.setOnClickListener {
             Log.d("Button", "Purple button tapped")
             vibrate()
 
@@ -205,23 +205,23 @@ class MainActivity : AppCompatActivity() {
             tts?.stop()
 
             // Checks if we are not at last audio file
-            if (current_audio_index < audio_queue.size - 1) {
+            if (currentAudioIndex < audioQueue.size - 1) {
 
                 // Save progress and pause the current audio before switching
-                pause_audio()
+                pauseAudio()
 
                 // Saves the current audio file to the stack before leaving it
-                previous_audio_stack.add(audio_queue[current_audio_index])
+                previousAudioStack.add(audioQueue[currentAudioIndex])
 
                 // Increments index by 1
-                current_audio_index++
+                currentAudioIndex++
 
                 // Ejects the old audio file
-                media_player?.release()
-                media_player = null
+                mediaPlayer?.release()
+                mediaPlayer = null
 
                 speak("שם הקובץ הינו")
-                title_read()
+                titleRead()
 
             } else {
                 speak("הגעת לסוף הרשימה")
@@ -233,7 +233,7 @@ class MainActivity : AppCompatActivity() {
         /**
          * Previous logic
          */
-        previous_btn.setOnClickListener {
+        previousBtn.setOnClickListener {
             Log.d("Button", "White button tapped")
             vibrate()
 
@@ -241,10 +241,10 @@ class MainActivity : AppCompatActivity() {
             tts?.stop()
 
             // Checks if we are not at last audio file
-            if (current_audio_index > 0) {
+            if (currentAudioIndex > 0) {
                 previous()
                 speak("שם הקובץ הינו")
-                title_read()
+                titleRead()
             } else {
                 speak("הגעת לתחילת הרשימה")
                 Log.d("Audio", "Start of playlist reached")
@@ -255,22 +255,22 @@ class MainActivity : AppCompatActivity() {
     // TTS function
     private fun speak(text: String, id: String = "") {
         // Stops the audio file before talking so the user can hear the instructions
-        if (media_player?.isPlaying == true)
-            pause_audio()
+        if (mediaPlayer?.isPlaying == true)
+            pauseAudio()
 
         tts?.speak(text, TextToSpeech.QUEUE_ADD, null, id)
     }
 
     // Function that reads the title of the current audio file
-    private fun title_read(id: String = "") {
+    private fun titleRead(id: String = "") {
         // Gets the current ID number
-        val current_id = audio_queue[current_audio_index]
+        val currentId = audioQueue[currentAudioIndex]
 
         // Translates the ID into a raw file name
-        val file_name = resources.getResourceEntryName(current_id)
+        val fileName = resources.getResourceEntryName(currentId)
 
         // Reads the file name
-        speak(file_name, id)
+        speak(fileName, id)
     }
 
     // TTS cleanup function when app stops
@@ -300,47 +300,47 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function that handles playing audio.
-    private fun play_audio(audio_res_id: Int) {
+    private fun playAudio(audioResId: Int) {
         // Releases an old player if it exists
-        media_player?.release()
+        mediaPlayer?.release()
 
         // Initializes new player
-        media_player = MediaPlayer.create(this, audio_res_id)
+        mediaPlayer = MediaPlayer.create(this, audioResId)
 
         // Pulls saved time from SharedPreferences
-        val saved_position = prefs.getInt("last_pos_$audio_res_id", 0)
+        val savedPosition = prefs.getInt("last_pos_$audioResId", 0)
 
         // Seeks the audio to the saved time if it exists
-        media_player?.seekTo(saved_position)
+        mediaPlayer?.seekTo(savedPosition)
 
         // Starts audio
-        media_player?.start()
+        mediaPlayer?.start()
     }
 
     // Function that handles pausing audio.
-    private fun pause_audio() {
-        media_player?.let { player ->
+    private fun pauseAudio() {
+        mediaPlayer?.let { player ->
             if (player.isPlaying) {
                 // Gets the audio id
-                val audio_id = audio_queue[current_audio_index]
+                val audioId = audioQueue[currentAudioIndex]
 
                 // Gets the current position
-                val raw_position = player.currentPosition
+                val rawPosition = player.currentPosition
 
                 // Subtract 3 seconds
-                val adjusted_position = if (raw_position > 3000) {
-                    raw_position - 3000
+                val adjustedPosition = if (rawPosition > 3000) {
+                    rawPosition - 3000
                 } else {
                     0
                 }
 
                 // Save position and current index to SharedPreferences
-                prefs.edit().putInt("last_pos_$audio_id", adjusted_position).apply()
-                prefs.edit().putInt("last_active_index", current_audio_index).apply()
+                prefs.edit().putInt("last_pos_$audioId", adjustedPosition).apply()
+                prefs.edit().putInt("last_active_index", currentAudioIndex).apply()
 
                 // Pauses
                 player.pause()
-                Log.d("Audio", "Paused at $raw_position, saved as $adjusted_position")
+                Log.d("Audio", "Paused at $rawPosition, saved as $adjustedPosition")
             }
         }
     }
@@ -348,20 +348,20 @@ class MainActivity : AppCompatActivity() {
     // Function that handles going back to previous audio.
     private fun previous() {
         // Checks if the previous stack not empty
-        if (previous_audio_stack.isNotEmpty()) {
+        if (previousAudioStack.isNotEmpty()) {
 
             //
-            pause_audio()
+            pauseAudio()
 
             // Pulls newest audio file from the stack and decrements the size of the stack by 1
-            val last_id = previous_audio_stack.removeAt(previous_audio_stack.size - 1)
+            val lastId = previousAudioStack.removeAt(previousAudioStack.size - 1)
 
             // Sets the current index to be the previous file
-            current_audio_index = audio_queue.indexOf(last_id)
+            currentAudioIndex = audioQueue.indexOf(lastId)
 
             // Ejects the old audio file
-            media_player?.release()
-            media_player = null
+            mediaPlayer?.release()
+            mediaPlayer = null
         }
     }
 
@@ -371,6 +371,6 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
 
         // Save progress whenever app is hidden
-        pause_audio()
+        pauseAudio()
     } // This function essentially acts as a guard against closing the app before pausing the audio file
 }
