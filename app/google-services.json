@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "807417240752",
+    "project_id": "vision-impairment-app-2bd19",
+    "storage_bucket": "vision-impairment-app-2bd19.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:807417240752:android:4c9f2f730dbd9c73eeef75",
+        "android_client_info": {
+          "package_name": "com.example.via"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7fJ9kpsQRCaTtazARL7OYM4DsfSHm_iM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
