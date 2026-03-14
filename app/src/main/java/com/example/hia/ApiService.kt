@@ -1,41 +1,58 @@
 package com.example.via
 
-import retrofit2.http.Body
-import retrofit2.http.Header
-import retrofit2.http.POST
+import com.google.gson.annotations.SerializedName // Maps exact JSON keys from Dropbox to Kotlin variables.
+import retrofit2.http.Body // Marks the data sent in the request body.
+import retrofit2.http.Header // Adds specific headers (like auth tokens) to the API call.
+import retrofit2.http.POST // Defines the HTTP method as POST.
+import retrofit2.http.Query // Appends data directly to the URL string.
 
+// Holds the main response containing the list of files.
 data class DropboxResponse(val entries: List<DropboxEntry>)
-data class DropboxEntry(val name: String, val path_display: String)
-data class ListFolderArgs(val path: String = "")
 
-// MISSION 21: The Temporary Link Translator
-data class TempLinkRequest(val path: String)
-data class TempLinkResponse(val link: String)
-// The "Translator" for the login response
-data class TokenResponse(
-    val access_token: String,
-    val expires_in: Int
+// Holds the specific details of a single file from the Dropbox folder.
+data class DropboxEntry(
+    val name: String,
+    @SerializedName("path_display") val pathDisplay: String
 )
 
+// Formats the target folder path to send to Dropbox.
+data class ListFolderArgs(val path: String = "")
+
+// Formats the specific file path when asking Dropbox for a playable link.
+data class TempLinkRequest(val path: String)
+
+// Holds the direct streaming link returned by Dropbox.
+data class TempLinkResponse(val link: String)
+
+// Holds the newly refreshed access token data.
+data class TokenResponse(
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("expires_in") val expiresIn: Int
+)
+
+// The interface defining exactly how the app talks to the Dropbox servers.
 interface ApiService {
+
+    // Asks Dropbox for a list of all files inside a specific folder.
     @POST("2/files/list_folder")
     suspend fun listFolder(
         @Header("Authorization") token: String,
         @Body args: ListFolderArgs
     ): DropboxResponse
 
-    // The "Get Playable Link" Request
+    // Asks Dropbox to generate a temporary, direct streaming link for an audio file.
     @POST("2/files/get_temporary_link")
     suspend fun getTemporaryLink(
         @Header("Authorization") token: String,
         @Body args: TempLinkRequest
     ): TempLinkResponse
 
-    @retrofit2.http.POST("https://api.dropboxapi.com/oauth2/token")
+    // Trades the permanent refresh token for a fresh, temporary access token.
+    @POST("https://api.dropboxapi.com/oauth2/token")
     suspend fun refreshAccessToken(
-        @retrofit2.http.Query("grant_type") grantType: String = "refresh_token",
-        @retrofit2.http.Query("refresh_token") refreshToken: String,
-        @retrofit2.http.Query("client_id") clientId: String,
-        @retrofit2.http.Query("client_secret") clientSecret: String
+        @Query("grant_type") grantType: String = "refresh_token",
+        @Query("refresh_token") refreshToken: String,
+        @Query("client_id") clientId: String,
+        @Query("client_secret") clientSecret: String
     ): TokenResponse
 }

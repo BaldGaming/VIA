@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">VIA</string>
+    <string name="redBtn">Read Title/Explain buttons</string>
+    <string name="greenBtn">Start/Stop/FLAG</string>
+    <string name="yellowBtn">10 seconds rewind</string>
+    <string name="blueBtn">10 seconds forward</string>
+    <string name="whiteBtn">Previous</string>
+    <string name="pinkBtn">Next</string>
 </resources>

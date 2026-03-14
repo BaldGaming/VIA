@@ -141,9 +141,6 @@ class MainActivity : AppCompatActivity() {
             // If playing, pause it and save position
             if (currentPlayer != null && currentPlayer.isPlaying) {
                 pauseAudio()
-                // Releases the wakeLock
-                if (wakeLock?.isHeld == true)
-                    wakeLock?.release()
                 Log.d("VIA_Audio", "Audio paused manually")
             }
 
@@ -387,6 +384,10 @@ class MainActivity : AppCompatActivity() {
 
         // Initializes new player
         mediaPlayer = MediaPlayer().apply {
+
+            // This tells the player to hold a wake lock while playing
+            setWakeMode(this@MainActivity, PowerManager.PARTIAL_WAKE_LOCK)
+
             setDataSource(url)
 
 //            // Automatically moves to the next song when the current one finishes
@@ -437,8 +438,12 @@ class MainActivity : AppCompatActivity() {
                     putInt("last_active_index", currentAudioIndex)
                 }
 
-                // Pauses
+                // Pauses the player
                 player.pause()
+
+                // Safely releases the CPU WakeLock so it doesn't drain the battery
+                if (wakeLock?.isHeld == true) wakeLock?.release()
+
                 Log.d("VIA_Audio", "Paused at $rawPosition ms, saved as $adjustedPosition ms")
             }
         }
@@ -514,7 +519,7 @@ class MainActivity : AppCompatActivity() {
                     val nameLower = entry.name.lowercase()
                     if (nameLower.endsWith(".mp3") || nameLower.endsWith(".wav") ||
                         nameLower.endsWith(".aac") || nameLower.endsWith(".m4a")) {
-                        audioQueue.add(AudioFile(title = entry.name, path = entry.path_display))
+                        audioQueue.add(AudioFile(title = entry.name, path = entry.pathDisplay))
                     }
                 }
 
@@ -583,7 +588,7 @@ object DropboxAuth {
                 clientId = BuildConfig.DROPBOX_CLIENT_ID,
                 clientSecret = BuildConfig.DROPBOX_CLIENT_SECRET
             )
-            cachedToken = response.access_token
+            cachedToken = response.accessToken
             Log.d("VIA_Auth", "Access token successfully refreshed")
             "Bearer $cachedToken"
         } catch (e: Exception) {
