@@ -1,9 +1,9 @@
 <resources>
     <string name="app_name">VIA</string>
-    <string name="redBtn">Read Title/Explain buttons</string>
-    <string name="greenBtn">Start/Stop/Heard</string>
-    <string name="yellowBtn">10 seconds rewind/Restart audio</string>
-    <string name="blueBtn">10 seconds forward</string>
-    <string name="whiteBtn">Previous/Start of library</string>
-    <string name="pinkBtn">Next</string>
+    <string name="greenBtn">התחל / עצור / סמן כהושלם</string>
+    <string name="redBtn">הקראת כותרת / הסבר על כפתורים</string>
+    <string name="blueBtn">דילוג 10 שניות קדימה</string>
+    <string name="yellowBtn">חזרה 10 שניות אחורה / חזרה לתחילת הקובץ</string>
+    <string name="pinkBtn">קובץ הבא / מעבר לסוף רשימת הקבצים</string>
+    <string name="whiteBtn">קובץ קודם / מעבר לתחילת רשימת הקבצים</string>
 </resources>
