@@ -305,9 +305,20 @@ class MainActivity : AppCompatActivity() {
 
             // Checks if we are not at the first audio file
             if (currentAudioIndex > 0) {
-                previous()
+                // 1. Pause and save progress of the current audio
+                pauseAudio()
+
+                // 2. Simply subtract 1 from the index to go back
+                currentAudioIndex--
+
+                // 3. Eject the old audio file
+                mediaPlayer?.release()
+                mediaPlayer = null
+
+                // 4. Read the new title
                 speak("שם הקובץ הינו")
                 titleRead()
+
             } else {
                 speak("הגעת לתחילת הרשימה")
                 Log.d("VIA_Audio", "Start of playlist reached")
@@ -449,33 +460,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Function that handles going back to previous audio.
-    private fun previous() {
-        if (previousAudioStack.isNotEmpty()) {
-            pauseAudio()
-
-            // Pop the last AudioFile object from the stack
-            val lastFile = previousAudioStack.removeAt(previousAudioStack.size - 1)
-
-            // Finds the index of that specific object in our queue using Path for precision
-            val index = audioQueue.indexOfFirst { it.path == lastFile.path }
-
-            if (index != -1) {
-                currentAudioIndex = index
-                mediaPlayer?.release()
-                mediaPlayer = null
-
-                // Re-initializes Retrofit to fetch a new playback link
-                val apiService = Retrofit.Builder()
-                    .baseUrl("https://api.dropboxapi.com/")
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build()
-                    .create(ApiService::class.java)
-
-                startPlaybackWorkflow(apiService)
-            }
-        }
-    }
 
     // Function that handles fetching the direct streaming link and starting playback
     private fun startPlaybackWorkflow(apiService: ApiService) {
