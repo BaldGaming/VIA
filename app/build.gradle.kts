@@ -29,11 +29,15 @@ android {
         val clientId = localProperties.getProperty("DROPBOX_CLIENT_ID") ?: ""
         val clientSecret = localProperties.getProperty("DROPBOX_CLIENT_SECRET") ?: ""
         val refreshToken = localProperties.getProperty("DROPBOX_REFRESH_TOKEN") ?: ""
+        val azureKey = localProperties.getProperty("AZURE_TTS_KEY") ?: ""
+        val azureRegion = localProperties.getProperty("AZURE_TTS_REGION") ?: ""
 
         // Creates the fields for BuildConfig
         buildConfigField("String", "DROPBOX_CLIENT_ID", "\"$clientId\"")
         buildConfigField("String", "DROPBOX_CLIENT_SECRET", "\"$clientSecret\"")
         buildConfigField("String", "DROPBOX_REFRESH_TOKEN", "\"$refreshToken\"")
+        buildConfigField("String", "AZURE_TTS_KEY", "\"$azureKey\"")
+        buildConfigField("String", "AZURE_TTS_REGION", "\"$azureRegion\"")
     }
 
     buildFeatures {

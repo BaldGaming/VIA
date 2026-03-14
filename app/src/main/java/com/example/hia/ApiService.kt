@@ -5,6 +5,8 @@ import retrofit2.http.Body // Marks the data sent in the request body.
 import retrofit2.http.Header // Adds specific headers (like auth tokens) to the API call.
 import retrofit2.http.POST // Defines the HTTP method as POST.
 import retrofit2.http.Query // Appends data directly to the URL string.
+import retrofit2.Response // Retrofit Response wrapper.
+import okhttp3.ResponseBody
 
 // Holds the main response containing the list of files.
 data class DropboxResponse(val entries: List<DropboxEntry>)
@@ -55,4 +57,12 @@ interface ApiService {
         @Query("client_id") clientId: String,
         @Query("client_secret") clientSecret: String
     ): TokenResponse
+
+    @POST("v1")
+    suspend fun getAzureTTS(
+        @Header("Ocp-Apim-Subscription-Key") apiKey: String,
+        @Header("Content-Type") contentType: String = "application/ssml+xml",
+        @Header("X-Microsoft-OutputFormat") outputFormat: String = "riff-24khz-16bit-mono-pcm",
+        @Body ssml: okhttp3.RequestBody
+    ): Response<ResponseBody>
 }

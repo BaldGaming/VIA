@@ -7,8 +7,6 @@ import androidx.activity.enableEdgeToEdge // Lets the app draw behind the status
 import androidx.appcompat.app.AppCompatActivity // Acts as the base class for the main screen (MainActivity).
 import androidx.core.view.ViewCompat // Applies the window insets so UI doesn't overlap system bars.
 import androidx.core.view.WindowInsetsCompat // Measures the exact size of the system bars.
-import android.speech.tts.TextToSpeech // The voice engine that reads instructions and titles.
-import java.util.Locale // Sets the Text-to-Speech language specifically to Hebrew.
 import android.content.Context // Accesses system-level services (Preferences, Vibrator, Power).
 import android.os.Vibrator // Triggers haptic feedback on older Android versions.
 import android.os.VibrationEffect // Defines the exact strength and length of the vibration.
@@ -24,22 +22,29 @@ import kotlinx.coroutines.launch // Actually starts the background tasks (corout
 import android.widget.Toast // Shows the little pop-up message for the double-tap exit.
 import androidx.activity.OnBackPressedCallback // Handles the modern system back-button gestures safely.
 import androidx.core.content.edit // Simplifies saving data to SharedPreferences (KTX extension).
+import okhttp3.MediaType.Companion.toMediaType // Converts strings to MediaType for Retrofit.
+import okhttp3.RequestBody.Companion.toRequestBody // Converts strings to RequestBody for Retrofit.
+import java.io.File // Handles creating the temporary audio file.
+import java.io.FileOutputStream // Handles writing the audio bytes to the file.
+import com.example.via.BuildConfig // Exposes the Azure keys from local.properties.
+import android.speech.tts.TextToSpeech // The fallback voice engine for offline use.
+import java.util.Locale // Sets the fallback TTS language specifically to Hebrew.
 
 // Song data class
 data class AudioFile(val title: String, val path: String)
 
 class MainActivity : AppCompatActivity() {
-    // TTS memory
-    private var tts: TextToSpeech? = null
+
+    // Voice player memory
+    private var voicePlayer: MediaPlayer? = null
+    private var fallbackTts: TextToSpeech? = null
+    private var ttsJob: kotlinx.coroutines.Job? = null
 
     // Media player & Shared preferences memory
     private var mediaPlayer: MediaPlayer? = null
     private lateinit var prefs: SharedPreferences
 
-    // The stack for previous files (A)
-    private val previousAudioStack = mutableListOf<AudioFile>()
-
-    // The current queue (B)
+    // The current queue
     private var audioQueue = mutableListOf<AudioFile>()
     private var currentAudioIndex = 0
 
@@ -54,6 +59,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+
+        // Initializes the offline fallback TTS engine
+        fallbackTts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                fallbackTts?.setLanguage(Locale.forLanguageTag("he"))
+            }
+        }
 
         // Handles the system back button for the double-tap to exit feature (Android 13+ standard)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -83,26 +95,13 @@ class MainActivity : AppCompatActivity() {
         // Loads the last saved audio file index if exists. Else, defaults to the first file.
         currentAudioIndex = prefs.getInt("last_active_index", 0)
 
-        // Initializes the TTS engine
-        tts = TextToSpeech(this) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                // Sets language to Hebrew (using the modern forLanguageTag to avoid deprecation)
-                val result = tts?.setLanguage(Locale.forLanguageTag("he"))
-
-                // Checks if the Hebrew language is supported and installed on the device
-                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    Log.e("VIA_TTS", "Language missing or not supported")
-                }
-            }
-        }
-
         // Buttons
-        val playBtn = findViewById<Button>(R.id.button1) // Play\Pause\Marked as heard.
-        val titleBtn = findViewById<Button>(R.id.button) // Title read\Buttons read.
+        val playBtn = findViewById<Button>(R.id.button1) // Play / Pause / Marked as heard.
+        val titleBtn = findViewById<Button>(R.id.button) // Title read / Buttons read.
         val forwardBtn = findViewById<Button>(R.id.button3) // Forward 10 seconds.
-        val rewindBtn = findViewById<Button>(R.id.button2) // Rewind 10 seconds.
-        val nextBtn = findViewById<Button>(R.id.button5) // Next audio file.
-        val previousBtn = findViewById<Button>(R.id.button4) // Previous audio file.
+        val rewindBtn = findViewById<Button>(R.id.button2) // Rewind 10 seconds / Goto start of file.
+        val nextBtn = findViewById<Button>(R.id.button5) // Next / Last audio file.
+        val previousBtn = findViewById<Button>(R.id.button4) // Previous / First audio file.
 
         // Wakelock object
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -125,8 +124,13 @@ class MainActivity : AppCompatActivity() {
             Log.d("VIA_Button", "Play/Pause tapped")
             vibrate()
 
+            // Cancels active TTS requests
+            ttsJob?.cancel()
+
             // Stops the TTS if it's running
-            tts?.stop()
+            voicePlayer?.release()
+            voicePlayer = null
+            fallbackTts?.stop()
 
             // Waits until playlist is downloaded
             if (audioQueue.isEmpty()) {
@@ -161,13 +165,33 @@ class MainActivity : AppCompatActivity() {
                 Log.d("VIA_Audio", "Audio started workflow")
             }
         }
+
         playBtn.setOnLongClickListener { // long press (about 500ms)
-            // TODO: add long press functionality that marks the audio file as "heard"
             Log.d("VIA_Button", "Play/Pause held")
             vibrate()
 
+            // Cancels active TTS requests
+            ttsJob?.cancel()
+
             // Stops the TTS if it's running
-            tts?.stop()
+            voicePlayer?.release()
+            voicePlayer = null
+            fallbackTts?.stop()
+
+            // Toggles the heard status of the current file
+            if (audioQueue.isNotEmpty()) {
+                val currentPath = audioQueue[currentAudioIndex].path
+                val isCurrentlyHeard = prefs.getBoolean("heard_$currentPath", false)
+                val newHeardState = !isCurrentlyHeard
+
+                prefs.edit { putBoolean("heard_$currentPath", newHeardState) }
+
+                if (newHeardState) {
+                    speak("סומן כהושלם")
+                } else {
+                    speak("הסימון הוסר")
+                }
+            }
 
             true
         }
@@ -179,32 +203,17 @@ class MainActivity : AppCompatActivity() {
         titleBtn.setOnClickListener { // tap
             Log.d("VIA_Button", "Title tapped")
             vibrate()
-
-            // Stops the TTS if it's running
-            tts?.stop()
-
-            speak("שם הקובץ הינו")
-            titleRead()
+            readCurrentTitle()
         }
 
         titleBtn.setOnLongClickListener { // long press (about 500ms)
             Log.d("VIA_Button", "Title held")
             vibrate()
 
-            // Stops the TTS if it's running
-            tts?.stop()
-
-            speak("כפתור ירוק: הקשה קצרה תתחיל ותפסיק את השמע.")
-            speak("כפתור ירוק: הקשה ארוכה תסמן את השמע כ'הושלם'.")
-            speak("כפתור אדום: הקשה קצרה תשמיע את הכותרת.")
-            speak("כפתור אדום: הקשה ארוכה תקריא את כל הכפתורים.")
-            speak("כפתור כחול: הקשה תדלג עשר שניות קדימה.")
-            speak("כפתור צהוב: הקשה תחזור עשר שניות אחורה.")
-            speak("כפתור ורוד: הקשה תעבור לשמע הבא.")
-            speak("כפתור לבן: הקשה תחזור לשמע הקודם.")
-            speak("כפתור לבן: הקשה ארוכה תרענן את רשימת השמע.")
+            speak("כפתור ירוק: הקשה קצרה תתחיל ותפסיק את השמע. כפתור ירוק: הקשה ארוכה תסמן את השמע כ'הושלם'. כפתור אדום: הקשה קצרה תשמיע את הכותרת. כפתור אדום: הקשה ארוכה תקריא את כל הכפתורים. כפתור כחול: הקשה תדלג עשר שניות קדימה. כפתור צהוב: הקשה תחזור עשר שניות אחורה. כפתור ורוד: הקשה תעבור לשמע הבא. כפתור לבן: הקשה תחזור לשמע הקודם. כפתור לבן: הקשה ארוכה תרענן את רשימת השמע.")
             true
         }
+
 
 
         /**
@@ -264,17 +273,11 @@ class MainActivity : AppCompatActivity() {
             Log.d("VIA_Button", "Next tapped")
             vibrate()
 
-            // Stops the TTS if it's running
-            tts?.stop()
-
             // Checks if we are not at the last audio file
             if (currentAudioIndex < audioQueue.size - 1) {
 
                 // Save progress and pause the current audio before switching
                 pauseAudio()
-
-                // Saves the current audio file to the stack before leaving it
-                previousAudioStack.add(audioQueue[currentAudioIndex])
 
                 // Increments index by 1
                 currentAudioIndex++
@@ -283,13 +286,23 @@ class MainActivity : AppCompatActivity() {
                 mediaPlayer?.release()
                 mediaPlayer = null
 
-                speak("שם הקובץ הינו")
-                titleRead()
+                readCurrentTitle()
 
             } else {
                 speak("הגעת לסוף הרשימה")
                 Log.d("VIA_Audio", "End of playlist reached")
             }
+        }
+
+        nextBtn.setOnLongClickListener {
+            Log.d("VIA_Button", "Next held")
+            vibrate()
+            speak("עובר לסוף הרשימה")
+
+            // Shifts the audio index to the end
+            currentAudioIndex = audioQueue.size -1
+
+            true
         }
 
 
@@ -300,24 +313,19 @@ class MainActivity : AppCompatActivity() {
             Log.d("VIA_Button", "Previous tapped")
             vibrate()
 
-            // Stops the TTS if it's running
-            tts?.stop()
-
             // Checks if we are not at the first audio file
             if (currentAudioIndex > 0) {
-                // 1. Pause and save progress of the current audio
+                // Pause and save progress of the current audio
                 pauseAudio()
 
-                // 2. Simply subtract 1 from the index to go back
+                // Subtracts 1 from the index to go back
                 currentAudioIndex--
 
-                // 3. Eject the old audio file
+                // Ejects the old audio file
                 mediaPlayer?.release()
                 mediaPlayer = null
 
-                // 4. Read the new title
-                speak("שם הקובץ הינו")
-                titleRead()
+                readCurrentTitle()
 
             } else {
                 speak("הגעת לתחילת הרשימה")
@@ -328,46 +336,114 @@ class MainActivity : AppCompatActivity() {
         previousBtn.setOnLongClickListener { // long press (about 500ms)
             Log.d("VIA_Button", "Previous held")
             vibrate()
-            speak("מעדכן את רשימת השמעה")
+            speak("חוזר לתחילת הרשימה")
 
-            // Forces a manual library refresh
-            refreshLibrary(apiService)
+            // Resets the audio index
+            currentAudioIndex = 0
             true
         }
     }
 
-    // TTS function
-    private fun speak(text: String, id: String = "") {
-        // Stops the audio file before talking so the user can hear the instructions
-        if (mediaPlayer?.isPlaying == true)
-            pauseAudio()
-
-        tts?.speak(text, TextToSpeech.QUEUE_ADD, null, id)
+    // Function that strips the file extension and leading numbers
+    private fun getCleanTitle(rawTitle: String): String {
+        return rawTitle
+            .substringBeforeLast(".")
+            .replace(Regex("^\\d+[_\\s]*"), "")
     }
 
-    // Function that reads the title of the current audio file
-    private fun titleRead(id: String = "") {
+    // Function that reads the title and appends the heard status
+    private fun readCurrentTitle() {
         if (audioQueue.isEmpty()) {
             speak("רשימת ההשמעה ריקה")
             return
         }
 
-        // Gets the current file
-        val currentFile = audioQueue[currentAudioIndex]
+        val currentPath = audioQueue[currentAudioIndex].path
+        val cleanTitle = getCleanTitle(audioQueue[currentAudioIndex].title)
+        val isHeard = prefs.getBoolean("heard_$currentPath", false)
 
-        // Strips the file extension (like .mp3) so the TTS reads it naturally
-        val cleanTitle = currentFile.title.substringBeforeLast(".")
+        if (isHeard) {
+            speak("שם הקובץ הינו $cleanTitle. כבר האזנת לקובץ זה.")
+        } else {
+            speak("שם הקובץ הינו $cleanTitle")
+        }
+    }
 
-        // Reads the file name
-        speak(cleanTitle, id)
+    // TTS function
+    private fun speak(text: String) {
+        // Cancels active TTS requests
+        ttsJob?.cancel()
+
+        // Stops the TTS if it's running
+        voicePlayer?.release()
+        voicePlayer = null
+        fallbackTts?.stop()
+
+        // Pauses the main music player
+        if (mediaPlayer?.isPlaying == true) pauseAudio()
+
+        // Creates a separate Retrofit instance for the Azure endpoint
+        val azureRetrofit = Retrofit.Builder()
+            .baseUrl("https://${BuildConfig.AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/")
+            .build()
+            .create(ApiService::class.java)
+
+        // Formats the SSML request
+        val ssmlText = """
+            <speak version='1.0' xml:lang='he-IL'>
+                <voice xml:lang='he-IL' xml:gender='Male' name='he-IL-AvriNeural'>
+                    $text
+                </voice>
+            </speak>
+        """.trimIndent()
+
+        // Converts the string to a Retrofit request body
+        val mediaType = "application/ssml+xml".toMediaType()
+        val requestBody = ssmlText.toRequestBody(mediaType)
+
+        // Starts a tracked coroutine for the API call
+        ttsJob = lifecycleScope.launch {
+            try {
+                val response = azureRetrofit.getAzureTTS(
+                    apiKey = BuildConfig.AZURE_TTS_KEY,
+                    ssml = requestBody
+                )
+
+                if (response.isSuccessful) {
+                    response.body()?.bytes()?.let { audioBytes ->
+                        // Saves the voice stream to a temporary file
+                        val tempVoiceFile = File(cacheDir, "temp_voice.wav")
+                        FileOutputStream(tempVoiceFile).use { it.write(audioBytes) }
+
+                        // Plays the voice
+                        voicePlayer = MediaPlayer().apply {
+                            setDataSource(tempVoiceFile.absolutePath)
+                            prepare()
+                            start()
+                        }
+                    }
+                } else {
+                    Log.e("VIA_TTS", "Azure Error: ${response.code()} - ${response.message()}")
+                    // Falls back to Android TTS if Azure rejects the request
+                    fallbackTts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+                }
+            } catch (e: Exception) {
+                // Ignores cancellation exceptions
+                if (e !is kotlinx.coroutines.CancellationException) {
+                    Log.e("VIA_TTS", "Failed to connect to Azure: ${e.message}")
+                    // Falls back to Android TTS if internet drops
+                    fallbackTts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+                }
+            }
+        }
     }
 
     // Cleanup function when app is completely destroyed
     override fun onDestroy() {
-        if (tts != null) {
-            tts?.stop()
-            tts?.shutdown()
-        }
+        ttsJob?.cancel()
+        voicePlayer?.release()
+        mediaPlayer?.release()
+        fallbackTts?.shutdown()
         super.onDestroy()
     }
 
@@ -400,12 +476,6 @@ class MainActivity : AppCompatActivity() {
             setWakeMode(this@MainActivity, PowerManager.PARTIAL_WAKE_LOCK)
 
             setDataSource(url)
-
-//            // Automatically moves to the next song when the current one finishes
-//            setOnCompletionListener {
-//                Log.d("VIA_Audio", "Song finished automatically, moving to next")
-//                findViewById<Button>(R.id.button5).performClick()
-//            }
 
             // A listener to catch and report playback errors
             setOnErrorListener { _, what, extra ->
