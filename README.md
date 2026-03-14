@@ -1,4 +1,3 @@
-VIA (Vision Impairment App) is an app specifically tailored for my friend's grandfather,
-who recently lost most of his vision.
+VIA (Vision Impairment Assistant) is a custom-built accessibility tool designed for individuals with severe vision loss. Developed specifically for my friend’s grandfather, the app provides a tactile, high-contrast interface and voice-guided navigation to restore independence in media consumption.
 
-The app is essentially an audio player that let's the user listen to audio files and hear their titles.
+The app functions as a cloud-based audio player that leverages the Dropbox API to stream content. By utilizing a Permanent OAuth2 Refresh Token system, it ensures a seamless, hands-off experience for the end-user, requiring zero login or technical maintenance.
