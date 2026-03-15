@@ -4,6 +4,6 @@
     <string name="redBtn">הקראת כותרת / הסבר על כפתורים</string>
     <string name="blueBtn">דילוג 10 שניות קדימה</string>
     <string name="yellowBtn">חזרה 10 שניות אחורה / חזרה לתחילת הקובץ</string>
-    <string name="pinkBtn">קובץ הבא / מעבר לסוף רשימת הקבצים</string>
+    <string name="pinkBtn">קובץ הבא / מעבר לקובץ הראשון שעוד לא סומן כהושלם</string>
     <string name="whiteBtn">קובץ קודם / מעבר לתחילת רשימת הקבצים</string>
 </resources>

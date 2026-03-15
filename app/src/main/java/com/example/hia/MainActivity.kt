@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
     private var voicePlayer: MediaPlayer? = null
     private var fallbackTts: TextToSpeech? = null
     private var ttsJob: kotlinx.coroutines.Job? = null
+    private var progressJob: kotlinx.coroutines.Job? = null // Tracks playback progress to auto-mark files
 
     // Media player & Shared preferences memory
     private var mediaPlayer: MediaPlayer? = null
@@ -53,6 +54,9 @@ class MainActivity : AppCompatActivity() {
 
     // Memory for the double-tap exit logic
     private var pressedTime: Long = 0
+
+    // Tracks if the music should start after the current TTS ends
+    private var shouldAutoPlayNext = false
 
     // Initializes the main activity when the app launches
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -138,9 +142,6 @@ class MainActivity : AppCompatActivity() {
             Log.d("VIA_Button", "Play/Pause tapped")
             vibrate()
 
-            // Locks the button immediately to prevent spamming while loading
-            playBtn.isEnabled = false
-
             // Cancels active TTS requests
             ttsJob?.cancel()
 
@@ -153,7 +154,7 @@ class MainActivity : AppCompatActivity() {
             if (audioQueue.isEmpty()) {
                 speak("רשימת ההקובץה עדיין בטעינה, אנא המתן")
                 Log.w("VIA_Audio", "Playback blocked: audioQueue is empty")
-                return@setOnClickListener // Stops the function right here
+                return@setOnClickListener
             }
 
             // Gets the current media player instance
@@ -229,11 +230,7 @@ class MainActivity : AppCompatActivity() {
             Log.d("VIA_Button", "Title held")
             vibrate()
 
-            // Forces the screen to stay awake while speaking
-            if (voicePlayer?.isPlaying == true) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-            speak("כפתור ירוק: לחיצה קצרה תתחיל ותפסיק את הקובץ. כפתור ירוק: לחיצה ארוכה תסמן את הקובץ כהושלם. כפתור אדום: לחיצה קצרה תשמיע את הכותרת. כפתור אדום: לחיצה ארוכה תקריא את כל הכפתורים. כפתור כחול: לחיצה תדלג עשר שניות קדימה. כפתור צהוב: לחיצה תחזור עשר שניות אחורה. כפתור צהוב: לחיצה ארוכה תחזור לתחילת הקובץ. כפתור ורוד: לחיצה תעבור לקובץ הבא. כפתור ורוד: לחיצה ארוכה תעבור לסוף רשימת הקבצים. כפתור לבן: לחיצה תחזור לקובץ הקודם. כפתור לבן: לחיצה ארוכה תעבור לתחילת רשימת הקבצים... עבור הסברים נוספים, תפנה לירדן.")
+            speak("כפתור ירוק: לחיצה קצרה תתחיל ותפסיק את הקובץ. כפתור ירוק: לחיצה ארוכה תסמן את הקובץ כהושלם. כפתור אדום: לחיצה קצרה תשמיע את הכותרת. כפתור אדום: לחיצה ארוכה תקריא את כל הכפתורים. כפתור כחול: לחיצה תדלג עשר שניות קדימה. כפתור צהוב: לחיצה תחזור עשר שניות אחורה. כפתור צהוב: לחיצה ארוכה תחזור לתחילת הקובץ. כפתור ורוד: לחיצה תעבור לקובץ הבא. כפתור ורוד: לחיצה ארוכה תעבור לקובץ הבא שלא הושמע. כפתור לבן: לחיצה תחזור לקובץ הקודם. כפתור לבן: לחיצה ארוכה תעבור לתחילת רשימת הקבצים... עבור הסברים נוספים, תפנה לירדן.")
             true
         }
 
@@ -285,7 +282,7 @@ class MainActivity : AppCompatActivity() {
                 val audioPath = audioQueue[currentAudioIndex].path
                 prefs.edit { putInt("last_pos_$audioPath", 0) }
             }
-            speak("חזרת לתחילת הקובץ.")
+            speak("חזרתא לתחילת הקובץ.")
             true
         }
 
@@ -300,7 +297,7 @@ class MainActivity : AppCompatActivity() {
             // Checks if we are not at the last audio file
             if (currentAudioIndex < audioQueue.size - 1) {
 
-                // Saves progress and pauses the current audio before switching
+                // Pauses and saves progress of the current audio before switching
                 pauseAudio()
 
                 // Increments index by 1
@@ -321,10 +318,46 @@ class MainActivity : AppCompatActivity() {
         nextBtn.setOnLongClickListener {
             Log.d("VIA_Button", "Next held")
             vibrate()
-            speak("עובר לסוף הרשימה")
 
-            // Shifts the audio index to the end
-            currentAudioIndex = audioQueue.size - 1
+            var targetIndex = -1
+
+            // Searches forward from the current position for the nearest unread file
+            for (i in currentAudioIndex + 1 until audioQueue.size) {
+                if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
+                    targetIndex = i
+                    break
+                }
+            }
+
+            // Wraps around and searches from the beginning if no unread file is found ahead
+            if (targetIndex == -1) {
+                for (i in 0 until currentAudioIndex) {
+                    if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
+                        targetIndex = i
+                        break
+                    }
+                }
+            }
+
+            // Handles the logic if an unread file was found anywhere in the list
+            if (targetIndex != -1) {
+                // Pauses and saves progress of the current audio before switching
+                pauseAudio()
+
+                // Shifts the audio index to the found unread file
+                currentAudioIndex = targetIndex
+
+                // Ejects the old audio file
+                mediaPlayer?.release()
+                mediaPlayer = null
+
+                // Reads the new title aloud
+                readCurrentTitle()
+            } else {
+                // Notifies the user if literally all files have been marked as heard
+                speak("כל הקבצים סומנו כהושלמו")
+                Log.d("VIA_Audio", "No unheard files found")
+            }
 
             true
         }
@@ -395,10 +428,6 @@ class MainActivity : AppCompatActivity() {
 
     // TTS function
     private fun speak(text: String) {
-
-        // Reference the button to unlock it
-        val playBtn = findViewById<Button>(R.id.button1)
-
         // Cancels active TTS requests
         ttsJob?.cancel()
 
@@ -450,14 +479,17 @@ class MainActivity : AppCompatActivity() {
                         voicePlayer = MediaPlayer().apply {
                             setDataSource(tempVoiceFile.absolutePath)
 
-                            // Lets the screen sleep exactly when Azure finishes talking
                             setOnCompletionListener {
                                 keepScreenAwake(false)
+
+                                // Checks if the system is waiting to autoplay the next track
+                                if (shouldAutoPlayNext) {
+                                    shouldAutoPlayNext = false // Resets the flag
+                                    findViewById<Button>(R.id.button1).performClick() // Clicks play
+                                }
                             }
 
                             prepare()
-
-                            // Forces the screen awake exactly when Azure starts talking
                             keepScreenAwake(true)
                             start()
                         }
@@ -473,9 +505,6 @@ class MainActivity : AppCompatActivity() {
                     Log.e("VIA_TTS", "Failed to connect to Azure: ${e.message}")
                     // Falls back to Android TTS if internet drops (Note the added "VIA_ID")
                     fallbackTts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "VIA_ID")
-
-                    // Unlocks the button if a network error blocked the start
-                    playBtn.isEnabled = true
                 }
             }
         }
@@ -484,6 +513,7 @@ class MainActivity : AppCompatActivity() {
     // Cleans up memory and services when the app is completely destroyed
     override fun onDestroy() {
         ttsJob?.cancel()
+        progressJob?.cancel() // Stops the background progress tracker
         voicePlayer?.release()
         mediaPlayer?.release()
         fallbackTts?.shutdown()
@@ -509,38 +539,91 @@ class MainActivity : AppCompatActivity() {
 
     // Function that handles playing audio.
     private fun playAudio(url: String) {
+        // Releases an old player if it exists
         mediaPlayer?.release()
 
-        // Reference the button to unlock it
-        val playBtn = findViewById<Button>(R.id.button1)
-
+        // Initializes a new player
         mediaPlayer = MediaPlayer().apply {
+
+            // Tells the player to hold a wake lock while playing
             setWakeMode(this@MainActivity, PowerManager.PARTIAL_WAKE_LOCK)
+
             setDataSource(url)
 
+            // Sets a listener to catch and report playback errors
             setOnErrorListener { _, what, extra ->
                 Log.e("VIA_Audio", "MediaPlayer error: code=$what, extra=$extra")
                 speak("שגיאה בהפעלת הקובץ")
-                // Unlocks the button so the user can try again after an error
-                playBtn.isEnabled = true
                 true
             }
 
+            // Sets a listener to start playing only when buffering is done
             setOnPreparedListener { player ->
                 val savedPosition = prefs.getInt("last_pos_${audioQueue[currentAudioIndex].path}", 0)
                 player.seekTo(savedPosition)
                 player.start()
-                keepScreenAwake(true)
-
-                // Unlocks the button once the audio is playing
-                playBtn.isEnabled = true
+                keepScreenAwake(true) // Forces screen on when new audio starts
                 Log.d("VIA_Audio", "Playback ready and streaming")
+
+                // Cancels any existing progress tracker
+                progressJob?.cancel()
+
+                // Starts a background loop to check if the file reached 98% completion
+                progressJob = lifecycleScope.launch {
+                    while (mediaPlayer == player) {
+                        if (player.isPlaying && player.duration > 0) {
+                            val progress = player.currentPosition.toFloat() / player.duration
+                            if (progress >= 0.98f) {
+                                val currentPath = audioQueue[currentAudioIndex].path
+                                prefs.edit { putBoolean("heard_$currentPath", true) }
+                                Log.d("VIA_Audio", "Auto-marked as heard at 98%")
+                                break // Stops tracking once successfully marked
+                            }
+                        }
+                        kotlinx.coroutines.delay(1000) // Checks every second
+                    }
+                }
             }
 
+            // Triggers autoplay logic when a song finishes naturally
             setOnCompletionListener {
                 keepScreenAwake(false)
+
+                var targetIndex = -1
+
+                // Searches forward for the nearest unread file
+                for (i in currentAudioIndex + 1 until audioQueue.size) {
+                    if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
+                        targetIndex = i
+                        break
+                    }
+                }
+
+                // Attempts autoplay only if a fresh, unheard file was found ahead
+                if (targetIndex != -1) {
+                    Log.d("VIA_Audio", "Autoplay: Skips to next unheard file at index $targetIndex")
+
+                    // Advances the index manually to the unread file
+                    currentAudioIndex = targetIndex
+
+                    // Clears out the old media player
+                    mediaPlayer?.release()
+                    mediaPlayer = null
+
+                    // Prepares the clean transition speech
+                    val cleanTitle = getCleanTitle(audioQueue[currentAudioIndex].title)
+                    val text = "הקובץ הסתיים, עובר לקובץ הבא. שם הקובץ הינו $cleanTitle"
+
+                    // Sets the flag to play the song immediately after speaking, and triggers speech
+                    shouldAutoPlayNext = true
+                    speak(text)
+                } else {
+                    Log.d("VIA_Audio", "Autoplay: Stopped. No unheard files ahead.")
+                    // Autoplay naturally stops here.
+                }
             }
 
+            // Starts the background buffer
             prepareAsync()
         }
     }
@@ -682,9 +765,6 @@ class MainActivity : AppCompatActivity() {
     // exact moment the app is completely hidden from the user's screen.
     override fun onStop() {
         super.onStop()
-
-        // Saves progress whenever the app is hidden
-        pauseAudio()
     } // Acts as a guard against closing the app before pausing the audio file
 }
 
