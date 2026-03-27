@@ -405,13 +405,13 @@ class MainActivity : AppCompatActivity() {
     private fun getCleanTitle(rawTitle: String): String {
         return rawTitle
             .substringBeforeLast(".")
-            .replace(Regex("^\\d+[_\\s]*"), "")
+            .replace(Regex("_"), " .")
     }
 
     // Function that reads the title and appends the heard status
     private fun readCurrentTitle() {
         if (audioQueue.isEmpty()) {
-            speak("רשימת ההקובץה ריקה")
+            speak("רשימת הקבצים ריקה")
             return
         }
 
