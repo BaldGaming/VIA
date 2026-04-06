@@ -29,6 +29,10 @@ import java.io.FileOutputStream // Handles writing the audio bytes to the file.
 import com.example.via.BuildConfig // Exposes the Azure keys from local.properties.
 import android.speech.tts.TextToSpeech // The fallback voice engine for offline use.
 import java.util.Locale // Sets the fallback TTS language specifically to Hebrew.
+// Shit for daily reminders
+import java.text.SimpleDateFormat
+import java.util.Date
+
 
 // Song data class
 data class AudioFile(val title: String, val path: String)
@@ -110,6 +114,9 @@ class MainActivity : AppCompatActivity() {
         // Opens the app's private save file ("via_prefs") to remember things like audio timestamps
         prefs = getSharedPreferences("via_prefs", Context.MODE_PRIVATE)
 
+        // Preforms the daily announcement
+        checkAndPlayDailyInstructions()
+
         // Loads the last saved audio file index if exists. Else, defaults to the first file.
         currentAudioIndex = prefs.getInt("last_active_index", 0)
 
@@ -169,7 +176,6 @@ class MainActivity : AppCompatActivity() {
             // Resumes the player if already exists but paused
             else if (currentPlayer != null && !currentPlayer.isPlaying) {
                 currentPlayer.start()
-                keepScreenAwake(true) // Forces screen on when resumed
 
                 // Starts wakeLock with a 4-hour timeout (14400000ms) to save battery if forgotten
                 if (wakeLock?.isHeld == false)
@@ -208,7 +214,9 @@ class MainActivity : AppCompatActivity() {
 
                 if (newHeardState) {
                     speak("סומן כהושלם")
-                } else {
+                    syncHeardStatusToDropbox(currentPath) // Call sync function
+                }
+                else {
                     speak("הסימון הוסר")
                 }
             }
@@ -230,7 +238,7 @@ class MainActivity : AppCompatActivity() {
             Log.d("VIA_Button", "Title held")
             vibrate()
 
-            speak("כפתור ירוק: לחיצה קצרה תתחיל ותפסיק את הקובץ. כפתור ירוק: לחיצה ארוכה תסמן את הקובץ כהושלם. כפתור אדום: לחיצה קצרה תשמיע את הכותרת. כפתור אדום: לחיצה ארוכה תקריא את כל הכפתורים. כפתור כחול: לחיצה תדלג עשר שניות קדימה. כפתור צהוב: לחיצה תחזור עשר שניות אחורה. כפתור צהוב: לחיצה ארוכה תחזור לתחילת הקובץ. כפתור ורוד: לחיצה תעבור לקובץ הבא. כפתור ורוד: לחיצה ארוכה תעבור לקובץ הבא שלא הושמע. כפתור לבן: לחיצה תחזור לקובץ הקודם. כפתור לבן: לחיצה ארוכה תעבור לתחילת רשימת הקבצים... עבור הסברים נוספים, תפנה לירדן.")
+            speak("אתה משתמש באפליקציה בשם וי אה. כפתור ירוק: לחיצה קצרה תתחיל ותפסיק את הקובץ. כפתור ירוק: לחיצה ארוכה תסמן את הקובץ כהושלם. כפתור אדום: לחיצה קצרה תשמיע את הכותרת. כפתור אדום: לחיצה ארוכה תקריא את כל הכפתורים. כפתור כחול: לחיצה תדלג עשר שניות קדימה. כפתור צהוב: לחיצה תחזור עשר שניות אחורה. כפתור צהוב: לחיצה ארוכה תחזור לתחילת הקובץ. כפתור ורוד: לחיצה תעבור לקובץ הבא. כפתור ורוד: לחיצה ארוכה תעבור לקובץ הבא שלא הושמע. כפתור לבן: לחיצה תחזור לקובץ הקודם. כפתור לבן: לחיצה ארוכה תעבור לתחילת רשימת הקבצים... עבור הסברים נוספים, תפנה לירדן.")
             true
         }
 
@@ -316,50 +324,42 @@ class MainActivity : AppCompatActivity() {
         }
 
         nextBtn.setOnLongClickListener {
-            Log.d("VIA_Button", "Next held")
             vibrate()
 
-            var targetIndex = -1
-
-            // Searches forward from the current position for the nearest unread file
-            for (i in currentAudioIndex + 1 until audioQueue.size) {
-                if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
-                    targetIndex = i
-                    break
-                }
-            }
-
-            // Wraps around and searches from the beginning if no unread file is found ahead
-            if (targetIndex == -1) {
-                for (i in 0 until currentAudioIndex) {
+            // If White is already being held down
+            if (previousBtn.isPressed) {
+                Log.d("VIA_System", "Dual-hold detected: Exiting app")
+                exitAppWorkflow()
+                true
+            } else {
+                // Normal skip-to-unheard logic
+                Log.d("VIA_Button", "Next held")
+                var targetIndex = -1
+                for (i in currentAudioIndex + 1 until audioQueue.size) {
                     if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
                         targetIndex = i
                         break
                     }
                 }
+                if (targetIndex == -1) {
+                    for (i in 0 until currentAudioIndex) {
+                        if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
+                            targetIndex = i
+                            break
+                        }
+                    }
+                }
+                if (targetIndex != -1) {
+                    pauseAudio()
+                    currentAudioIndex = targetIndex
+                    mediaPlayer?.release()
+                    mediaPlayer = null
+                    readCurrentTitle()
+                } else {
+                    speak("כל הקבצים סומנו כהושלמו")
+                }
+                true
             }
-
-            // Handles the logic if an unread file was found anywhere in the list
-            if (targetIndex != -1) {
-                // Pauses and saves progress of the current audio before switching
-                pauseAudio()
-
-                // Shifts the audio index to the found unread file
-                currentAudioIndex = targetIndex
-
-                // Ejects the old audio file
-                mediaPlayer?.release()
-                mediaPlayer = null
-
-                // Reads the new title aloud
-                readCurrentTitle()
-            } else {
-                // Notifies the user if literally all files have been marked as heard
-                speak("כל הקבצים סומנו כהושלמו")
-                Log.d("VIA_Audio", "No unheard files found")
-            }
-
-            true
         }
 
 
@@ -390,14 +390,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        previousBtn.setOnLongClickListener { // long press (about 500ms)
-            Log.d("VIA_Button", "Previous held")
+        previousBtn.setOnLongClickListener {
             vibrate()
-            speak("חוזר לתחילת הרשימה")
 
-            // Resets the audio index
-            currentAudioIndex = 0
-            true
+            // If Pink is already being held down
+            if (nextBtn.isPressed) {
+                Log.d("VIA_System", "Dual-hold detected: Exiting app")
+                exitAppWorkflow()
+                true
+            } else {
+                // Normal reset-to-start logic
+                Log.d("VIA_Button", "Previous held")
+                speak("חוזר לתחילת הרשימה")
+                currentAudioIndex = 0
+                true
+            }
         }
     }
 
@@ -562,7 +569,6 @@ class MainActivity : AppCompatActivity() {
                 val savedPosition = prefs.getInt("last_pos_${audioQueue[currentAudioIndex].path}", 0)
                 player.seekTo(savedPosition)
                 player.start()
-                keepScreenAwake(true) // Forces screen on when new audio starts
                 Log.d("VIA_Audio", "Playback ready and streaming")
 
                 // Cancels any existing progress tracker
@@ -576,6 +582,7 @@ class MainActivity : AppCompatActivity() {
                             if (progress >= 0.98f) {
                                 val currentPath = audioQueue[currentAudioIndex].path
                                 prefs.edit { putBoolean("heard_$currentPath", true) }
+                                syncHeardStatusToDropbox(currentPath) // Call sync function
                                 Log.d("VIA_Audio", "Auto-marked as heard at 98%")
                                 break // Stops tracking once successfully marked
                             }
@@ -690,47 +697,28 @@ class MainActivity : AppCompatActivity() {
     private fun refreshLibrary(apiService: ApiService) {
         lifecycleScope.launch {
             try {
-                // Validates the token before scanning the folder
                 val token = DropboxAuth.getValidToken(apiService)
-                if (token.isEmpty()) return@launch
-
                 val response = apiService.listFolder(token, ListFolderArgs("/via_audio"))
+                val lastCount = prefs.getInt("last_known_count", 0)
 
-                // Gets the count saved last time (defaults to 0 if it's the first time ever)
-                val lastKnownCount = prefs.getInt("last_known_count", 0)
-
-                // Clears the audio queue
                 audioQueue.clear()
-
                 response.entries.forEach { entry ->
-                    val nameLower = entry.name.lowercase()
-                    if (nameLower.endsWith(".mp3") || nameLower.endsWith(".wav") ||
-                        nameLower.endsWith(".aac") || nameLower.endsWith(".m4a")) {
-                        audioQueue.add(AudioFile(title = entry.name, path = entry.pathDisplay))
+                    val name = entry.name.lowercase()
+                    if (name.endsWith(".h")) return@forEach
+                    if (name.endsWith(".mp3") || name.endsWith(".wav")) {
+                        audioQueue.add(AudioFile(entry.name, entry.pathDisplay))
                     }
                 }
 
-                // Sorts the audio queue alphabetically
-                audioQueue.sortBy { it.title }
+                // NATURAL SORTING: 400 comes before 1000
+                audioQueue.sortWith(compareBy<AudioFile> { file ->
+                    Regex("\\d+").find(file.title)?.value?.toLong() ?: Long.MAX_VALUE
+                }.thenBy { it.title.lowercase() })
 
-                // Calculates the difference between what we have in memory and what we currently have
-                val newFilesCount = audioQueue.size - lastKnownCount
-
-                // Checks if the folder size is bigger than what we have stored in "prefs"
-                if (newFilesCount == 1) {
-                    speak("נוסף קובץ אחד חדש")
-                } else if (newFilesCount > 1) {
-                    speak("נוספו $newFilesCount קבצים חדשים")
-                }
-
-                // Saves the current size for the next check cleanly
+                val newFiles = audioQueue.size - lastCount
+                if (newFiles > 0) speak("נוספו קבצים חדשים")
                 prefs.edit { putInt("last_known_count", audioQueue.size) }
-
-                Log.d("VIA_Dropbox", "Library synced. Total files: ${audioQueue.size}")
-
-            } catch (e: Exception) {
-                Log.e("VIA_Dropbox", "Library refresh failed: ${e.message}")
-            }
+            } catch (e: Exception) { Log.e("VIA", "Library Error: ${e.message}") }
         }
     }
 
@@ -745,6 +733,103 @@ class MainActivity : AppCompatActivity() {
                 Log.d("VIA_Screen", "Screen allowed to SLEEP")
             }
         }
+    }
+
+    private fun syncHeardStatusToDropbox(audioPath: String) {
+        lifecycleScope.launch {
+            try {
+                // THE FIX: Dropbox uses the 'content' subdomain for uploads
+                val apiService = Retrofit.Builder()
+                    .baseUrl("https://content.dropboxapi.com/")
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
+                    .create(ApiService::class.java)
+
+                val token = DropboxAuth.getValidToken(apiService)
+                if (token.isEmpty()) return@launch
+
+                // Chops off the extension (e.g., .mp3) and replaces it with .h
+                val markerPath = audioPath.substringBeforeLast(".") + ".h"
+
+                // The JSON instructions for Dropbox
+                val rawJson = """{"path": "$markerPath", "mode": "overwrite", "mute": true}"""
+
+                // Sanitizer: Converts Hebrew letters to ASCII-safe Unicode escapes (\uXXXX)
+                // to prevent the "Unexpected char" error in the HTTP header.
+                val safeJson = rawJson.map { char ->
+                    if (char.code > 127) {
+                        "\\u" + String.format("%04x", char.code)
+                    } else {
+                        char.toString()
+                    }
+                }.joinToString("")
+
+                val emptyBody = "".toRequestBody("application/octet-stream".toMediaType())
+
+                // Sends the request to the correct content.dropboxapi.com domain
+                val response = apiService.uploadFile(token, safeJson, emptyBody)
+
+                if (response.isSuccessful) {
+                    Log.d("VIA_Sync", "SUCCESS: Marker created at $markerPath")
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("VIA_Sync", "Dropbox Rejected: ${response.code()} - $errorBody")
+                }
+            } catch (e: Exception) {
+                Log.e("VIA_Sync", "Sync Connection Error: ${e.message}")
+            }
+        }
+    }
+
+    private fun checkAndPlayDailyInstructions() {
+        val sdf = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+        val today = sdf.format(Date())
+        val lastPlayedDate = prefs.getString("last_instruction_date", "")
+
+        if (today != lastPlayedDate) {
+            // List of all possible "tips"
+            val allInstructions = listOf(
+                "כפתור ירוק: לחיצה קצרה תתחיל ותפסיק את הקובץ.",
+                "כפתור ירוק: לחיצה ארוכה תסמן את הקובץ כהושלם.",
+                "כפתור אדום: לחיצה קצרה תשמיע את הכותרת.",
+                "כפתור אדום: לחיצה ארוכה תקריא את כל הכפתורים.",
+                "כפתור כחול: לחיצה תדלג עשר שניות קדימה.",
+                "כפתור צהוב: לחיצה תחזור עשר שניות אחורה.",
+                "כפתור צהוב: לחיצה ארוכה תחזור לתחילת הקובץ.",
+                "כפתור ורוד: לחיצה תעבור לקובץ הבא.",
+                "כפתור ורוד: לחיצה ארוכה תעבור לקובץ הבא שלא הושמע.",
+                "כפתור לבן: לחיצה תחזור לקובץ הקודם.",
+                "כפתור לבן: לחיצה ארוכה תעבור לתחילת רשימת הקבצים.",
+                "אתה משתמש באפליקציה בשם וי אה."
+            )
+
+            // Pick 1 random tip from the list and play it
+            val randomInstruction = allInstructions.random()
+            speak(randomInstruction)
+
+            // Save the date so it won'r repeat itself
+            prefs.edit {
+                putString("last_instruction_date", today)
+            }
+
+            Log.d("VIA_Instructions", "Daily random tip played: $randomInstruction")
+        }
+    }
+
+    // Saves progress and kills the app completely (removes from tray)
+    private fun exitAppWorkflow() {
+        vibrate()
+        pauseAudio() // This saves the current index and the 3-second-rewound position
+
+        // finishAndRemoveTask() closes the activity and removes it from the 'Recents' screen
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            finishAndRemoveTask()
+        } else {
+            finish()
+        }
+
+        // Ensures the process is actually killed
+        System.exit(0)
     }
 
     // Performs a silent library refresh when the app is brought back to the screen
