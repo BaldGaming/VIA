@@ -36,6 +36,9 @@ import java.util.Locale // Sets the fallback TTS language specifically to Hebrew
 import org.json.JSONObject // Safely builds JSON requests for Dropbox markers.
 import java.text.SimpleDateFormat // Shit for daily reminders
 import java.util.Date
+// These are for pausing audio when receiving a call.
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 
 
 // Song data class
@@ -165,7 +168,7 @@ class MainActivity : AppCompatActivity() {
 
             // Waits until playlist is downloaded
             if (audioQueue.isEmpty()) {
-                speak("רשימת ההקובץה עדיין בטעינה, אנא המתן")
+                speak("רשימת הקבצים עדיין בטעינה, אנא המתן")
                 Log.w("VIA_Audio", "Playback blocked: audioQueue is empty")
                 return@setOnClickListener
             }
@@ -293,6 +296,9 @@ class MainActivity : AppCompatActivity() {
                 true
             }
             else {
+                // Pauses the audio so it doesn't overlap with the TTS
+                pauseAudio()
+
                 mediaPlayer?.let { player ->
                     // Shifts the current position to the start of the current audio file
                     player.seekTo(0)
@@ -442,9 +448,12 @@ class MainActivity : AppCompatActivity() {
 
         // Extracts all unique, valid channels currently available in the queue
         val availableChannels = audioQueue.map { file ->
+            // Uses Regex to find the first continuous string of digits in the title, defaulting to 0 if none exist
             val num = Regex("\\d+").find(file.title)?.value?.toLong() ?: 0L
-            (num / 1000).toInt()
-        }.filter { it in 1..9 }.toSortedSet().toList()
+            (num / 100).toInt() // E.g. (1019 / 100) -> 10, AKA Channel 10.
+                                // E.g. (2510 / 100) -> 25, AKA Channel 25
+
+        }.filter { it in 10..99}.toSortedSet().toList()
 
         Log.d("VIA_System", "HopChannel: Detected active channels in library: $availableChannels")
 
@@ -455,7 +464,7 @@ class MainActivity : AppCompatActivity() {
 
         val currentFile = audioQueue[currentAudioIndex]
         val currentNum = Regex("\\d+").find(currentFile.title)?.value?.toLong() ?: 0L
-        val currentChannel = (currentNum / 1000).toInt()
+        val currentChannel = (currentNum / 100).toInt()
 
         var targetChannel = -1
 
@@ -488,7 +497,7 @@ class MainActivity : AppCompatActivity() {
         // Scans the queue to find the absolute first file belonging to the target channel range
         for (i in 0 until audioQueue.size) {
             val fileNum = Regex("\\d+").find(audioQueue[i].title)?.value?.toLong() ?: 0L
-            val channel = (fileNum / 1000).toInt()
+            val channel = (fileNum / 100).toInt()
 
             if (channel == targetChannel) {
                 targetIndex = i
@@ -539,47 +548,59 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Function that manages the local cache window and deletes old files
+    // Function that manages the local cache window
     private fun updateSlidingWindow() {
+        // Prevents crashing if the queue hasn't loaded yet
         if (audioQueue.isEmpty()) return
 
-        val startIndex = maxOf(0, currentAudioIndex - 2)
-        val endIndex = minOf(audioQueue.size - 1, currentAudioIndex + 2)
+        // Defines a 31-track window (15 behind, current, 15 ahead) to keep in cache.
+        // maxOf/minOf prevents the window from extending past the very start or end of the playlist.
+        val startIndex = maxOf(0, currentAudioIndex - 15)
+        val endIndex = minOf(audioQueue.size - 1, currentAudioIndex + 15)
 
-        val validFilenames = mutableSetOf<String>()
-
+        // Loops through the window to prefetch their specific TTS titles
         for (i in startIndex..endIndex) {
             val cleanTitle = getCleanTitle(audioQueue[i].title)
             val textNormal = "שם הקובץ הינו $cleanTitle"
             val textHeard = "שם הקובץ הינו $cleanTitle. כבר האזנת לקובץ זה."
 
-            validFilenames.add("${textNormal.hashCode()}.wav")
-            validFilenames.add("${textHeard.hashCode()}.wav")
-
+            // Silently downloads the audio file if it doesn't already exist
             prefetchTTS(textNormal)
             prefetchTTS(textHeard)
         }
 
-        // Also protects the static channel strings from being deleted
-        for (i in 1..9) {
-            validFilenames.add("${"ערוץ $i".hashCode()}.wav")
-            validFilenames.add("${"ערוץ מספר $i הוא הערוץ הנמוך ביותר כרגע".hashCode()}.wav")
-            validFilenames.add("${"ערוץ מספר $i הוא הערוץ הגבוה ביותר כרגע".hashCode()}.wav")
-        }
-        validFilenames.add("${"ערוץ לא קיים".hashCode()}.wav")
-        validFilenames.add("${"אין ערוצים זמינים".hashCode()}.wav")
+        // Dynamically extract active channels
+        val availableChannels = audioQueue.map { file ->
+            val num = Regex("\\d+").find(file.title)?.value?.toLong() ?: 0L
+            (num / 100).toInt()
+        }.filter { it in 10..99 }.toSortedSet().toList()
 
-        val ttsCacheDir = File(cacheDir, "tts_cache")
-        if (ttsCacheDir.exists()) {
-            ttsCacheDir.listFiles()?.forEach { file ->
-                // Checks the cache folder and deletes unneeded files
-                if (!validFilenames.contains(file.name)) {
-                    file.delete()
-                    Log.d("VIA_TTS", "Cleaned up old cache file: ${file.name}")
-                }
-            }
+        // Pre-fetches the static channel strings
+        availableChannels.forEach { channelNum ->
+            prefetchTTS("ערוץ $channelNum")
+            prefetchTTS("ערוץ מספר $channelNum הוא הערוץ הנמוך ביותר כרגע")
+            prefetchTTS("ערוץ מספר $channelNum הוא הערוץ הגבוה ביותר כרגע")
         }
-        Log.d("VIA_TTS", "Sliding window updated. Total valid cache signatures maintained: ${validFilenames.size}")
+
+        // Pre-fetches all core UI commands
+        val staticStrings = listOf(
+            "רשימת הקבצים ריקה",
+            "אין ערוצים זמינים",
+            "ערוץ לא קיים",
+            "הגעת לסוף הרשימה",
+            "חוזר לתחילת הרשימה",
+            "סומן כהושלם",
+            "הסימון הוסר",
+            "שגיאה בהפעלת הקובץ",
+            "חזרתא לתחילת הקובץ.",
+            "רשימת הקבצים עדיין בטעינה, אנא המתן",
+            "כל הקבצים סומנו כהושלמו",
+            "האפליקציה בודקת אם יש עדכון ברשימת הקבצים",
+            "נוסף קובץ אחד חדש"
+        )
+        staticStrings.forEach { prefetchTTS(it) }
+
+        Log.d("VIA_TTS", "Sliding window prefetch complete. Cache deletion disabled to preserve Azure tokens.")
     }
 
     // TTS function
@@ -598,6 +619,7 @@ class MainActivity : AppCompatActivity() {
         // Pauses the main music player
         if (mediaPlayer?.isPlaying == true) pauseAudio()
 
+        // Creates the local cache folder if it doesn't already exist
         val ttsCacheDir = File(cacheDir, "tts_cache").apply { mkdirs() }
         val cachedVoiceFile = File(ttsCacheDir, "${text.hashCode()}.wav")
 
@@ -608,7 +630,25 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        Log.i("VIA_TTS", "Local Cache MISS. Requesting network stream from Azure for hash: ${text.hashCode()}")
+        // TTS Token tracker
+        // Formats today's date to check if a new billing month has started (e.g. "2026-04")
+        val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+        val currentMonth = sdf.format(Date())
+        val savedMonth = prefs.getString("tts_month", "")
+
+        var currentCount = prefs.getInt("tts_char_count", 0)
+
+        // Resets the count to 0 if it is a new month
+        if (currentMonth != savedMonth) {
+            currentCount = 0
+            prefs.edit { putString("tts_month", currentMonth) }
+        }
+
+        // Adds the character length of the current sentence to the monthly odometer
+        val newCount = currentCount + text.length
+        prefs.edit { putInt("tts_char_count", newCount) }
+
+        Log.i("VIA_TTS", "Monthly Azure Characters Used: $newCount / 500000")
 
         // Creates a separate Retrofit instance for the Azure endpoint
         val azureRetrofit = Retrofit.Builder()
@@ -688,6 +728,25 @@ class MainActivity : AppCompatActivity() {
 
         if (cachedVoiceFile.exists()) return
 
+        // TTS Token tracker
+        val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+        val currentMonth = sdf.format(Date())
+        val savedMonth = prefs.getString("tts_month", "")
+
+        var currentCount = prefs.getInt("tts_char_count", 0)
+
+        // Resets the count to 0 if it is a new month
+        if (currentMonth != savedMonth) {
+            currentCount = 0
+            prefs.edit { putString("tts_month", currentMonth) }
+        }
+
+        // Adds the character length of the current sentence to the monthly odometer
+        val newCount = currentCount + text.length
+        prefs.edit { putInt("tts_char_count", newCount) }
+
+        Log.i("VIA_TTS", "Monthly Azure Characters Used: $newCount / 500000 (Prefetch)")
+
         val azureRetrofit = Retrofit.Builder()
             .baseUrl("https://${BuildConfig.AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/")
             .build()
@@ -747,71 +806,81 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function that handles playing audio.
-    private fun playAudio(url: String) {
-        // Releases an old player if it exists
+    private fun playAudio(url: String, apiService: ApiService) {
         mediaPlayer?.release()
 
-        // Initializes a new player
         mediaPlayer = ExoPlayer.Builder(this@MainActivity).build().apply {
+            // Wraps the raw URL into a format ExoPlayer understands
             val mediaItem = MediaItem.fromUri(url)
             setMediaItem(mediaItem)
 
-            // Shifts the player to the saved position before buffering
             val savedPosition = prefs.getInt("last_pos_${audioQueue[currentAudioIndex].path}", 0).toLong()
             Log.d("VIA_Audio", "Restoring track position from prefs: $savedPosition ms")
             seekTo(savedPosition)
 
             playWhenReady = true
 
-            // Sets a listener to catch errors and track playback state
+            // Tells the Android OS that this app is playing media, allowing the OS to manage focus
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                .build()
+
+            setAudioAttributes(audioAttributes, true)
+
+            // Forces Android to keep the CPU and Wi-Fi active while buffering
+            setWakeMode(C.WAKE_MODE_NETWORK)
+
             addListener(object : Player.Listener {
                 override fun onPlayerError(error: PlaybackException) {
-                    Log.e("VIA_Audio", "ExoPlayer error during playback: ${error.message}")
-                    speak("שגיאה בהפעלת הקובץ")
+                    Log.e("VIA_Audio", "ExoPlayer error: ${error.errorCodeName} - ${error.message}")
+
+                    // Catches expired Dropbox links (401/403) or dropped Wi-Fi connections
+                    if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
+                        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED) {
+
+                        Log.w("VIA_Audio", "Link expired or network dropped. Auto-recovering...")
+
+                        // Pauses to safely write the exact crash timestamp to SharedPreferences
+                        pauseAudio()
+
+                        // Re-triggers the auth flow to get a fresh link and resume
+                        startPlaybackWorkflow(apiService)
+                    } else {
+                        speak("שגיאה בהפעלת הקובץ")
+                    }
                 }
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_READY) {
                         Log.d("VIA_Audio", "Playback READY and streaming successfully.")
-
-                        // Cancels any existing progress tracker
                         progressJob?.cancel()
-
-                        // Starts a background loop to check if the file reached 98% completion
                         progressJob = lifecycleScope.launch {
-                            Log.d("VIA_System", "Background progress tracker started for current track.")
+                            Log.d("VIA_System", "Background progress tracker started.")
                             while (mediaPlayer == this@apply) {
                                 if (isPlaying && duration > 0) {
                                     val progress = currentPosition.toFloat() / duration
                                     val currentPath = audioQueue[currentAudioIndex].path
 
-                                    // Checks progress and ensures we don't spam uploads if already marked
                                     if (progress >= 0.98f && !prefs.getBoolean("heard_$currentPath", false)) {
                                         prefs.edit { putBoolean("heard_$currentPath", true) }
-                                        syncHeardStatusToDropbox(currentPath) // Call sync function
+                                        syncHeardStatusToDropbox(currentPath)
                                         Log.i("VIA_Audio", "Auto-marked track as HEARD at 98% completion.")
                                     }
                                 }
-                                // Lowered to 500ms so it doesn't sleep through short tracks
                                 kotlinx.coroutines.delay(500)
                             }
                         }
                     } else if (playbackState == Player.STATE_ENDED) {
-
-                        // THE SAFETY NET: If the track ends naturally or is skipped to the end, guarantee it gets marked!
                         val currentPath = audioQueue[currentAudioIndex].path
                         if (!prefs.getBoolean("heard_$currentPath", false)) {
                             prefs.edit { putBoolean("heard_$currentPath", true) }
                             syncHeardStatusToDropbox(currentPath)
-                            Log.i("VIA_Audio", "Auto-marked track as HEARD at 100% completion (Safety Net).")
                         }
 
-                        // Triggers autoplay logic when a song finishes naturally
                         keepScreenAwake(false)
-
                         var targetIndex = -1
 
-                        // Searches forward for the nearest unread file
                         for (i in currentAudioIndex + 1 until audioQueue.size) {
                             if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
                                 targetIndex = i
@@ -819,35 +888,37 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
 
-                        // Attempts autoplay only if a fresh, unheard file was found ahead
                         if (targetIndex != -1) {
-                            Log.d("VIA_Audio", "Autoplay triggered. Skipping to next unheard file at index $targetIndex")
-
-                            // Advances the index manually to the unread file
                             currentAudioIndex = targetIndex
-
                             updateSlidingWindow()
-
-                            // Clears out the old media player
                             mediaPlayer?.release()
                             mediaPlayer = null
 
-                            // Prepares the clean transition speech
                             val cleanTitle = getCleanTitle(audioQueue[currentAudioIndex].title)
-                            val text = "הקובץ הסתיים, עובר לקובץ הבא. שם הקובץ הינו $cleanTitle"
-
-                            // Sets the flag to play the song immediately after speaking, and triggers speech
                             shouldAutoPlayNext = true
-                            speak(text)
-                        } else {
-                            Log.i("VIA_Audio", "Autoplay stopped. No unheard files found ahead in queue.")
-                            // Autoplay naturally stops here.
+                            speak("הקובץ הסתיים, עובר לקובץ הבא. שם הקובץ הינו $cleanTitle")
                         }
                     }
                 }
-            })
 
-            // Starts the background buffer
+                override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                    super.onPlaybackSuppressionReasonChanged(playbackSuppressionReason)
+                    if (playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS) {
+                        this@apply.pause()
+                        val rawPosition = this@apply.currentPosition
+                        val adjustedPosition = if (rawPosition > 3000) rawPosition - 3000 else 0
+                        this@apply.seekTo(adjustedPosition)
+
+                        val audioPath = audioQueue[currentAudioIndex].path
+                        prefs.edit {
+                            putInt("last_pos_$audioPath", adjustedPosition.toInt())
+                            putInt("last_active_index", currentAudioIndex)
+                        }
+                        keepScreenAwake(false)
+                        if (wakeLock?.isHeld == true) wakeLock?.release()
+                    }
+                }
+            })
             prepare()
         }
     }
@@ -902,7 +973,7 @@ class MainActivity : AppCompatActivity() {
                 val linkResponse = apiService.getTemporaryLink(token, TempLinkRequest(currentFile.path))
 
                 Log.i("VIA_Dropbox", "Streaming link fetched successfully.")
-                playAudio(linkResponse.link) // Now we play the valid link
+                playAudio(linkResponse.link, apiService) // Now we play the valid link
             } catch (e: Exception) {
                 Log.e("VIA_Dropbox", "Failed to fetch streaming link: ${e.message}")
                 speak("שגיאה בהפעלת הקובץ")
@@ -939,7 +1010,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // Sorts the audio queue numerically
+                // Sorts the audio queue numerically based on the first number found in the title
                 audioQueue.sortWith(Comparator { file1, file2 ->
                     val regex = Regex("(\\d+)") // Finds groups of numbers
                     val parts1 = regex.findAll(file1.title).map { it.value.toLong() }.toList()
@@ -954,12 +1025,19 @@ class MainActivity : AppCompatActivity() {
                     }
                 })
 
-                // Pre-fetches the standard static channel names so they play instantly
-                for (i in 1..9) {
-                    prefetchTTS("ערוץ $i")
-                    prefetchTTS("ערוץ מספר $i הוא הערוץ הנמוך ביותר כרגע")
-                    prefetchTTS("ערוץ מספר $i הוא הערוץ הגבוה ביותר כרגע")
+                // Dynamically extract only the channels that actually exist to save Azure API calls
+                val availableChannels = audioQueue.map { file ->
+                    val num = Regex("\\d+").find(file.title)?.value?.toLong() ?: 0L
+                    (num / 100).toInt()
+                }.filter { it in 10..99 }.toSortedSet().toList()
+
+                // Pre-fetches the standard static channel names only for active channels
+                availableChannels.forEach { channelNum ->
+                    prefetchTTS("ערוץ $channelNum")
+                    prefetchTTS("ערוץ מספר $channelNum הוא הערוץ הנמוך ביותר כרגע")
+                    prefetchTTS("ערוץ מספר $channelNum הוא הערוץ הגבוה ביותר כרגע")
                 }
+
                 prefetchTTS("ערוץ לא קיים")
                 prefetchTTS("אין ערוצים זמינים")
 
@@ -1054,6 +1132,7 @@ class MainActivity : AppCompatActivity() {
         // We leave the 4-hour shift in place, but it won't affect our minute-test
         val shiftedTimeMillis = System.currentTimeMillis() - (4 * 60 * 60 * 1000)
 
+        // Creates a logical day string (e.g., "20260429") based on the 4-hour shifted time
         val sdf = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
         val logicalToday = sdf.format(Date(shiftedTimeMillis))
 
@@ -1065,19 +1144,14 @@ class MainActivity : AppCompatActivity() {
             // List of all possible "tips"
             val allInstructions = listOf(
                 "אתה משתמש באפליקציה בשם וי אה.",
-                "כפתור ירוק: לחיצה תתחיל ותפסיק את השמע.",
-                "כפתור ירוק: לחיצה ארוכה תסמן כהושלם.",
-                "כפתור אדום: תקריא את הכותרת.",
-                "כפתור אדום: לחיצה ארוכה תשמיע את כל הכפתורים.",
-                "כפתור כחול: מעבר לערוץ הבא.",
-                "כפתור צהוב: מעבר לערוץ הקודם.",
-                "כפתור צהוב: לחיצה ארוכה תעביר לתחילת הקובץ.",
-                "לחיצה על כחול וצהוב יחד ירענן את הרשימה.",
-                "כפתור ורוד: מעבר לקובץ הבא.",
-                "כפתור ורוד: לחיצה ארוכה יעביר לקובץ הבא שלא הושמע עדיין.",
-                "כפתור לבן: מעבר לקובץ הקודם.",
-                "כפתור לבן: לחיצה ארוכה תעביר לתחילת הרשימה.",
-                "לחיצה על ורוד ולבן יחד תסגור את האפליקציה."
+                "כפתור ירוק: לחיצה תתחיל ותפסיק את השמע, לחיצה ארוכה תסמן כהושלם.",
+                "כפתור אדום: תקריא את הכותרת, ולחיצה ארוכה תשמיע את כל הכפתורים.",
+                "כפתור כחול: מעבר לערוץ הבא",
+                "כפתור צהוב: מעבר לערוץ הקודם, ולחיצה ארוכה תעביר לתחילת הקובץ",
+                "לחיצה על כחול וצהוב יחד ירענן את הרשימה",
+                "כפתור ורוד: קובץ הבא, ולחיצה ארוכה יעביר לקובץ הבא שלא הושמע עדיין",
+                "כפתור לבן: קובץ קודם, ולחיצה ארוכה תעביר לתחילת הרשימה",
+                "לחיצה על ורוד ולבן יחד תסגור את האפליקציה"
             )
 
             // Pick 1 random tip from the list and play it
