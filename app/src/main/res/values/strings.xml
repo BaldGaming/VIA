@@ -1,9 +1,9 @@
 <resources>
     <string name="app_name">VIA</string>
-    <string name="greenBtn">התחל / עצור / סמן כהושלם</string>
+    <string name="greenBtn">התחל / עצור / סמן כהושמע</string>
     <string name="redBtn">הקראת כותרת / הסבר על כפתורים</string>
     <string name="blueBtn">ערוץ קדימה</string>
     <string name="yellowBtn">ערוץ אחורה / חזרה לתחילת הקובץ</string>
-    <string name="pinkBtn">קובץ הבא / מעבר לקובץ הראשון שעוד לא סומן כהושלם</string>
+    <string name="pinkBtn">קובץ הבא / מעבר לקובץ הראשון שעוד לא סומן כהושמע</string>
     <string name="whiteBtn">קובץ קודם / מעבר לתחילת רשימת הקבצים</string>
 </resources>

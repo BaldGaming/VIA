@@ -1,8 +1,63 @@
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.util.Properties
+
+// AUTO-VERSIONING SCRIPT
+// UPDATE THIS MANUALLY!!!!!!!
+val majorVersion = 3
+
+val versionPropsFile = file("version.properties")
+val versionProps = Properties()
+
+// Auto-creates the tracking file if it doesn't exist yet
+if (!versionPropsFile.exists()) {
+    versionProps["MINOR"] = "0"
+    versionProps["PATCH"] = "0"
+    versionProps.store(FileOutputStream(versionPropsFile), null)
+}
+
+versionProps.load(FileInputStream(versionPropsFile))
+
+var minorCount = versionProps["MINOR"].toString().toInt()
+var patchCount = versionProps["PATCH"].toString().toInt()
+
+// The lock: Identifies if an actual compilation task is running.
+// Uses taskNames to correctly catch the "Generate Signed Bundle / APK" wizard.
+val activeTasks = gradle.startParameter.taskNames.toString().lowercase()
+val isBuildingAPK = activeTasks.contains("assemble") || activeTasks.contains("bundle")
+val isRunButton = project.hasProperty("android.injected.build.abi")
+
+if (isBuildingAPK && !isRunButton) {
+    patchCount++
+
+    // Shifts the patch to minor if it hits 10 (e.g., 3.0.9 -> 3.1.0)
+    if (patchCount > 9) {
+        patchCount = 0
+        minorCount++
+    }
+
+    // Saves the new numbers back to the file
+    versionProps["MINOR"] = minorCount.toString()
+    versionProps["PATCH"] = patchCount.toString()
+    versionProps.store(FileOutputStream(versionPropsFile), null)
+}
+
+// Combines the manual Major with the auto Minor/Patch
+val computedVersionName = "$majorVersion.$minorCount.$patchCount"
+
+// Safely generates a unique whole number for Google Play (Multiplied by 100,000 so the Minor version can go up to 999 safely)
+val computedVersionCode = (majorVersion * 100000) + (minorCount * 100) + patchCount
+// Ends here!
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.google.gms.google.services)
+}
+
+// Google's official, crash-proof way to name APKs in modern AGP.
+// Will output as: via_v3.0.2-debug.apk or via_v3.0.2-release.apk
+base {
+    archivesName.set("via_v${computedVersionName}")
 }
 
 android {
@@ -13,8 +68,10 @@ android {
         applicationId = "com.example.via"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+
+        // Auto-injected versioning
+        versionCode = computedVersionCode
+        versionName = computedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

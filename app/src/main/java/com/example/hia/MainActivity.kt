@@ -69,6 +69,10 @@ class MainActivity : AppCompatActivity() {
     // Tracks if the music should start after the current TTS ends
     private var shouldAutoPlayNext = false
 
+    // Define a "dot" and "comma" breaks for the TTS so it can sound more natural.
+    private val dot = "<break time='1200ms'/>"
+    private val comma = "<break time='600ms'/>"
+
     // Initializes the main activity when the app launches
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -249,8 +253,9 @@ class MainActivity : AppCompatActivity() {
             Log.d("VIA_Button", "Title held")
             vibrate()
 
-            speak("אתה משתמש באפליקציה בשם וי אה. כפתור ירוק: לחיצה תתחיל ותפסיק את השמע, לחיצה ארוכה תסמן כהושלם. כפתור אדום: תקריא את הכותרת, ולחיצה ארוכה תשמיע את כל הכפתורים. כפתור כחול: מעבר לערוץ הבא. כפתור צהוב: מעבר לערוץ הקודם, ולחיצה ארוכה תעביר לתחילת הקובץ. לחיצה על כחול וצהוב יחד ירענן את הרשימה. כפתור ורוד: קובץ הבא, ולחיצה ארוכה יעביר לקובץ הבא שלא הושמע עדיין. כפתור לבן: קובץ קודם, ולחיצה ארוכה תעביר לתחילת הרשימה. לחיצה על ורוד ולבן יחד תסגור את האפליקציה. עבור הסברים נוספים, תפנה לירדן.")
+            speak("אתה משתמש באפליקציה בשם וי אה$dot כפתור ירוק: לחיצה תתחיל ותפסיק את השמע$comma ולחיצה ארוכה תסמן כנשמע$dot כפתור אדום: תקריא את הכותרת$comma ולחיצה ארוכה תשמיע את כל הכפתורים$dot כפתור כחול: מעביר לערוץ הבא$dot כפתור צהוב: מעביר לערוץ הקודם$comma ולחיצה ארוכה תעביר לתחילת הקובץ$dot לחיצה על כחול וצהוב יחד ירענן את הרשימה$dot כפתור ורוד: מעביר לקובץ הבא$comma ולחיצה ארוכה יעביר לקובץ הבא שלא הושמע עדיין$dot כפתור לבן: מעביר לקובץ קודם$comma ולחיצה ארוכה תעביר לתחילת הרשימה$dot לחיצה על ורוד ולבן יחד תסגור את האפליקציה$dot עבור הסברים נוספים$comma תפנה לירדן$dot")
             true
+
         }
 
 
@@ -451,7 +456,7 @@ class MainActivity : AppCompatActivity() {
             // Uses Regex to find the first continuous string of digits in the title, defaulting to 0 if none exist
             val num = Regex("\\d+").find(file.title)?.value?.toLong() ?: 0L
             (num / 100).toInt() // E.g. (1019 / 100) -> 10, AKA Channel 10.
-                                // E.g. (2510 / 100) -> 25, AKA Channel 25
+            // E.g. (2510 / 100) -> 25, AKA Channel 25
 
         }.filter { it in 10..99}.toSortedSet().toList()
 
@@ -492,25 +497,37 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        var targetIndex = -1
+        var channelStartIndex = -1
+        var channelEndIndex = -1
 
-        // Scans the queue to find the absolute first file belonging to the target channel range
+        // Scans the queue to find the absolute boundaries (start and end index) of the target channel
         for (i in 0 until audioQueue.size) {
             val fileNum = Regex("\\d+").find(audioQueue[i].title)?.value?.toLong() ?: 0L
             val channel = (fileNum / 100).toInt()
 
             if (channel == targetChannel) {
-                targetIndex = i
-                break
+                if (channelStartIndex == -1) channelStartIndex = i
+                channelEndIndex = i
             }
         }
 
-        if (targetIndex != -1) {
+        if (channelStartIndex != -1) {
+            var targetIndex = channelStartIndex
+
+            // Scans strictly within the target channel's bounds to find the first unheard track
+            for (i in channelStartIndex..channelEndIndex) {
+                if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
+                    targetIndex = i
+                    Log.d("VIA_System", "HopChannel: Found unheard track at index $targetIndex within Channel $targetChannel")
+                    break
+                }
+            }
+
             Log.d("VIA_System", "HopChannel: Jumping to index $targetIndex (Channel $targetChannel)")
             vibrate()
             pauseAudio()
 
-            // Shifts the index to the start of the new channel
+            // Shifts the index to the target file
             currentAudioIndex = targetIndex
             updateSlidingWindow()
 
@@ -522,6 +539,7 @@ class MainActivity : AppCompatActivity() {
             speak("ערוץ $targetChannel")
         }
     }
+
 
     // Function that strips the file extension and leading numbers
     private fun getCleanTitle(rawTitle: String): String {
@@ -1143,14 +1161,14 @@ class MainActivity : AppCompatActivity() {
 
             // List of all possible "tips"
             val allInstructions = listOf(
-                "אתה משתמש באפליקציה בשם וי אה.",
-                "כפתור ירוק: לחיצה תתחיל ותפסיק את השמע, לחיצה ארוכה תסמן כהושלם.",
-                "כפתור אדום: תקריא את הכותרת, ולחיצה ארוכה תשמיע את כל הכפתורים.",
-                "כפתור כחול: מעבר לערוץ הבא",
-                "כפתור צהוב: מעבר לערוץ הקודם, ולחיצה ארוכה תעביר לתחילת הקובץ",
+                "אתה משתמש באפליקציה בשם וי אה",
+                "כפתור ירוק: לחיצה תתחיל ותפסיק את השמע$comma ולחיצה ארוכה תסמן כנשמע",
+                "כפתור אדום: תקריא את הכותרת$comma ולחיצה ארוכה תשמיע את כל הכפתורים",
+                "כפתור כחול: מעביר לערוץ הבא",
+                "כפתור צהוב: מעביר לערוץ הקודם$comma ולחיצה ארוכה תעביר לתחילת הקובץ",
                 "לחיצה על כחול וצהוב יחד ירענן את הרשימה",
-                "כפתור ורוד: קובץ הבא, ולחיצה ארוכה יעביר לקובץ הבא שלא הושמע עדיין",
-                "כפתור לבן: קובץ קודם, ולחיצה ארוכה תעביר לתחילת הרשימה",
+                "כפתור ורוד: מעביר לקובץ הבא$comma ולחיצה ארוכה יעביר לקובץ הבא שלא הושמע עדיין",
+                "כפתור לבן: מעביר לקובץ קודם$comma ולחיצה ארוכה תעביר לתחילת הרשימה",
                 "לחיצה על ורוד ולבן יחד תסגור את האפליקציה"
             )
 
