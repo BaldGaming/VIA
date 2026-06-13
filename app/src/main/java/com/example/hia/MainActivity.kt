@@ -560,7 +560,7 @@ class MainActivity : AppCompatActivity() {
         val isHeard = prefs.getBoolean("heard_$currentPath", false)
 
         if (isHeard) {
-            speak("שם הקובץ הינו $cleanTitle. כבר האזנת לקובץ זה.")
+            speak("כבר האזנת לקובץ זה. שם הקובץ הינו $cleanTitle.")
         } else {
             speak("שם הקובץ הינו $cleanTitle")
         }
