@@ -77,4 +77,11 @@ interface ApiService {
         @Header("Dropbox-API-Arg") args: String, // Contains the path
         @Body fileBody: RequestBody
     ): Response<Unit>
+
+    // Fetch the "index.txt" file from DropBox
+    @POST("2/files/download")
+    suspend fun downloadIndex(
+        @Header("Authorization") token: String,
+        @Header("Dropbox-API-Arg") args: String
+    ): retrofit2.Response<okhttp3.ResponseBody>
 }

@@ -60,6 +60,9 @@ class MainActivity : AppCompatActivity() {
     private var audioQueue = mutableListOf<AudioFile>()
     private var currentAudioIndex = 0
 
+    // An empty mutable map for channel names
+    private val channelsMap = mutableMapOf<Int, String>()
+
     // PowerManager instance
     private var wakeLock: PowerManager.WakeLock? = null
 
@@ -1008,6 +1011,23 @@ class MainActivity : AppCompatActivity() {
                 val token = DropboxAuth.getValidToken(apiService)
                 if (token.isEmpty()) return@launch
 
+                // Pass a min JSON object to DropBox then receive the text into "indexResponse".
+                val indexArgs = """{"path": "/via_audio/index.txt"}"""
+                val indexResponse = apiService.downloadIndex(token, indexArgs)
+
+                if (indexResponse.isSuccessful) {
+                    val indexText = indexResponse.body()?.string() // This is a (potentially) long ass String that will be parsed.
+                }
+
+                // Splits the massive string into a List of individual lines
+                val lines = indexText?.split("\n") ?: emptyList()
+
+                // Parse only info we care about
+                for (s in lines) {
+
+                }
+
+                // Scan the main folder for the MP3s
                 val response = apiService.listFolder(token, ListFolderArgs("/via_audio"))
 
                 // Gets the count saved last time (defaults to 0 if it's the first time ever)
