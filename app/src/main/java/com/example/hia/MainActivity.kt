@@ -538,8 +538,14 @@ class MainActivity : AppCompatActivity() {
             mediaPlayer?.release()
             mediaPlayer = null
 
-            // Announces the new channel strictly
-            speak("ערוץ $targetChannel")
+            // Announces the new channel alongside it's name
+            if (channelsMap.containsKey(targetChannel)) {
+                speak("ערוץ $targetChannel, ${channelsMap[targetChannel]}")
+            }
+            else {
+                // A fallback in case the channel isn't in index.txt
+                speak("ערוץ $targetChannel")
+            }
         }
     }
 
@@ -601,6 +607,11 @@ class MainActivity : AppCompatActivity() {
             prefetchTTS("ערוץ $channelNum")
             prefetchTTS("ערוץ מספר $channelNum הוא הערוץ הנמוך ביותר כרגע")
             prefetchTTS("ערוץ מספר $channelNum הוא הערוץ הגבוה ביותר כרגע")
+
+            // Checks the channelMap and pre-fetches channel names
+            if (channelsMap.containsKey(channelNum)) {
+                prefetchTTS("ערוץ $channelNum, ${channelsMap[channelNum]}")
+            }
         }
 
         // Pre-fetches all core UI commands
@@ -1011,20 +1022,52 @@ class MainActivity : AppCompatActivity() {
                 val token = DropboxAuth.getValidToken(apiService)
                 if (token.isEmpty()) return@launch
 
+                // Create a special Retrofit instance just for downloading content
+                val contentApiService = Retrofit.Builder()
+                    .baseUrl("https://content.dropboxapi.com/")
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
+                    .create(ApiService::class.java)
+
                 // Pass a min JSON object to DropBox then receive the text into "indexResponse".
                 val indexArgs = """{"path": "/via_audio/index.txt"}"""
-                val indexResponse = apiService.downloadIndex(token, indexArgs)
+                val indexResponse = contentApiService.downloadIndex(token, indexArgs)
 
+                // Define a regex for the titles
+                val cleanupRegex = Regex("^\\d{4}\\s*-\\s*|\\s*-\\s*\\d{4}$")
+
+                // Parsing logic
                 if (indexResponse.isSuccessful) {
                     val indexText = indexResponse.body()?.string() // This is a (potentially) long ass String that will be parsed.
+
+                    // Splits the massive string into a List of individual lines
+                    val lines = indexText?.split("\n") ?: emptyList()
+
+                    // Parse only info we care about (title names and channel nums)
+                    for (s in lines) {
+                        // Check if the line even has a 4-digit number
+                        val numMatch = Regex("\\d{4}").find(s)
+
+                        if (numMatch != null) {
+                            // Extract and divide by 100 to get the channel num
+                            val channelNum = (numMatch.value.toLong() / 100).toInt()
+
+                            // Wipe the number and the dash from the string, resulting in the channel name
+                            val channelName = s.replace(cleanupRegex, "").trim()
+
+                            // Save it to the map
+                            channelsMap[channelNum] = channelName
+                        }
+                    }
+                    Log.d("VIA_Index", "Successfully parsed index.txt!")
+                }
+                else {
+                    Log.e("VIA_Index", "Failed to download index.txt: HTTP ${indexResponse.code()} - ${indexResponse.errorBody()?.string()}")
                 }
 
-                // Splits the massive string into a List of individual lines
-                val lines = indexText?.split("\n") ?: emptyList()
-
-                // Parse only info we care about
-                for (s in lines) {
-
+                // Log the channelMap
+                channelsMap.forEach { (key, value) ->
+                    Log.i("VIA_Index", "Key: $key, Value: $value")
                 }
 
                 // Scan the main folder for the MP3s
