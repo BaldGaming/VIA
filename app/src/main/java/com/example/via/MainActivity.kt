@@ -13,7 +13,14 @@ import android.os.VibrationEffect // Defines the exact strength and length of th
 import android.os.VibratorManager // Triggers haptic feedback on newer Android versions (Android 12+).
 import android.os.Build // Checks the device's Android version to pick the right vibrator service.
 import android.media.MediaPlayer // Streams and plays the local voice files.
-import androidx.media3.exoplayer.ExoPlayer // The modern, high-speed engine for streaming Dropbox files.
+
+// Media3 Remote Control Imports
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import android.content.ComponentName
+import com.google.common.util.concurrent.ListenableFuture
+import androidx.core.content.ContextCompat
+
 import androidx.media3.common.MediaItem // Represents the audio file for ExoPlayer.
 import androidx.media3.common.Player // Handles ExoPlayer state changes.
 import androidx.media3.common.PlaybackException // Handles ExoPlayer errors.
@@ -36,10 +43,6 @@ import java.util.Locale // Sets the fallback TTS language specifically to Hebrew
 import org.json.JSONObject // Safely builds JSON requests for Dropbox markers.
 import java.text.SimpleDateFormat // Shit for daily reminders
 import java.util.Date
-// These are for pausing audio when receiving a call.
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-
 
 // Song data class
 data class AudioFile(val title: String, val path: String)
@@ -52,9 +55,11 @@ class MainActivity : AppCompatActivity() {
     private var ttsJob: kotlinx.coroutines.Job? = null
     private var progressJob: kotlinx.coroutines.Job? = null // Tracks playback progress to auto-mark files
 
-    // Media player & Shared preferences memory
-    private var mediaPlayer: ExoPlayer? = null
+    // Media controller & Shared preferences memory
+    private var mediaController: MediaController? = null
+    private var controllerFuture: ListenableFuture<MediaController>? = null // Tracks the connection to the background service
     private lateinit var prefs: SharedPreferences
+    private lateinit var apiService: ApiService
 
     // The current queue
     private var audioQueue = mutableListOf<AudioFile>()
@@ -156,7 +161,7 @@ class MainActivity : AppCompatActivity() {
             .build()
 
         // API instance
-        val apiService = retrofit.create(ApiService::class.java)
+        apiService = retrofit.create(ApiService::class.java)
 
         /**
          * Play logic
@@ -181,7 +186,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             // Gets the current media player instance
-            val currentPlayer = mediaPlayer
+            val currentPlayer = mediaController
 
             // Pauses the player and saves position if already playing
             if (currentPlayer != null && currentPlayer.isPlaying) {
@@ -189,8 +194,8 @@ class MainActivity : AppCompatActivity() {
                 Log.d("VIA_Audio", "Audio paused manually")
             }
 
-            // Resumes the player if already exists but paused
-            else if (currentPlayer != null && !currentPlayer.isPlaying) {
+            // Checks if a song is actually loaded into the remote control
+            else if (currentPlayer != null && currentPlayer.currentMediaItem != null) {
                 currentPlayer.play()
 
                 // Starts wakeLock with a 4-hour timeout (14400000ms) to save battery if forgotten
@@ -201,7 +206,7 @@ class MainActivity : AppCompatActivity() {
 
             // Creates and plays audio if no player exists at all
             else {
-                startPlaybackWorkflow(apiService)
+                startPlaybackWorkflow()
                 // Starts wakeLock with a 4-hour timeout (14400000ms) to save battery if forgotten
                 if (wakeLock?.isHeld == false) wakeLock?.acquire(14400000L)
                 Log.d("VIA_Audio", "Audio started workflow")
@@ -307,7 +312,7 @@ class MainActivity : AppCompatActivity() {
                 // Pauses the audio so it doesn't overlap with the TTS
                 pauseAudio()
 
-                mediaPlayer?.let { player ->
+                mediaController?.let { player ->
                     // Shifts the current position to the start of the current audio file
                     player.seekTo(0)
 
@@ -339,11 +344,6 @@ class MainActivity : AppCompatActivity() {
                 currentAudioIndex++
 
                 updateSlidingWindow()
-
-                // Ejects the old audio file
-                mediaPlayer?.release()
-                mediaPlayer = null
-
                 readCurrentTitle()
 
             } else {
@@ -384,9 +384,6 @@ class MainActivity : AppCompatActivity() {
                     currentAudioIndex = targetIndex
 
                     updateSlidingWindow()
-
-                    mediaPlayer?.release()
-                    mediaPlayer = null
                     readCurrentTitle()
                 } else {
                     Log.d("VIA_System", "No unheard tracks remaining in queue.")
@@ -413,11 +410,6 @@ class MainActivity : AppCompatActivity() {
                 currentAudioIndex--
 
                 updateSlidingWindow()
-
-                // Ejects the old audio file
-                mediaPlayer?.release()
-                mediaPlayer = null
-
                 readCurrentTitle()
 
             } else {
@@ -534,10 +526,6 @@ class MainActivity : AppCompatActivity() {
             currentAudioIndex = targetIndex
             updateSlidingWindow()
 
-            // Kills the old audio (Requires user to manually press Green Play to start the channel)
-            mediaPlayer?.release()
-            mediaPlayer = null
-
             // Announces the new channel alongside it's name
             if (channelsMap.containsKey(targetChannel)) {
                 speak("ערוץ $targetChannel, ${channelsMap[targetChannel]}")
@@ -649,7 +637,7 @@ class MainActivity : AppCompatActivity() {
         keepScreenAwake(false)
 
         // Pauses the main music player
-        if (mediaPlayer?.isPlaying == true) pauseAudio()
+        if (mediaController?.isPlaying == true) pauseAudio()
 
         // Creates the local cache folder if it doesn't already exist
         val ttsCacheDir = File(cacheDir, "tts_cache").apply { mkdirs() }
@@ -803,7 +791,7 @@ class MainActivity : AppCompatActivity() {
                         Log.d("VIA_TTS", "Silently pre-fetched TTS to local storage for hash: ${text.hashCode()}")
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Log.e("VIA_TTS", "Silent pre-fetch failed for hash: ${text.hashCode()}")
             }
         }
@@ -815,7 +803,7 @@ class MainActivity : AppCompatActivity() {
         ttsJob?.cancel()
         progressJob?.cancel() // Stops the background progress tracker
         voicePlayer?.release()
-        mediaPlayer?.release()
+        mediaController?.release()
         fallbackTts?.shutdown()
         super.onDestroy()
     }
@@ -837,127 +825,28 @@ class MainActivity : AppCompatActivity() {
         vibrator.vibrate(effect)
     }
 
-    // Function that handles playing audio.
-    private fun playAudio(url: String, apiService: ApiService) {
-        mediaPlayer?.release()
+    // Function that handles playing audio via the background service.
+    private fun playAudio(url: String) {
+        val mediaItem = MediaItem.fromUri(url)
 
-        mediaPlayer = ExoPlayer.Builder(this@MainActivity).build().apply {
-            // Wraps the raw URL into a format ExoPlayer understands
-            val mediaItem = MediaItem.fromUri(url)
-            setMediaItem(mediaItem)
+        mediaController?.let { controller ->
+            // Hands the track to the background engine
+            controller.setMediaItem(mediaItem)
 
+            // Restores position
             val savedPosition = prefs.getInt("last_pos_${audioQueue[currentAudioIndex].path}", 0).toLong()
             Log.d("VIA_Audio", "Restoring track position from prefs: $savedPosition ms")
-            seekTo(savedPosition)
+            controller.seekTo(savedPosition)
 
-            playWhenReady = true
-
-            // Tells the Android OS that this app is playing media, allowing the OS to manage focus
-            val audioAttributes = AudioAttributes.Builder()
-                .setUsage(C.USAGE_MEDIA)
-                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                .build()
-
-            setAudioAttributes(audioAttributes, true)
-
-            // Forces Android to keep the CPU and Wi-Fi active while buffering
-            setWakeMode(C.WAKE_MODE_NETWORK)
-
-            addListener(object : Player.Listener {
-                override fun onPlayerError(error: PlaybackException) {
-                    Log.e("VIA_Audio", "ExoPlayer error: ${error.errorCodeName} - ${error.message}")
-
-                    // Catches expired Dropbox links (401/403) or dropped Wi-Fi connections
-                    if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
-                        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED) {
-
-                        Log.w("VIA_Audio", "Link expired or network dropped. Auto-recovering...")
-
-                        // Pauses to safely write the exact crash timestamp to SharedPreferences
-                        pauseAudio()
-
-                        // Re-triggers the auth flow to get a fresh link and resume
-                        startPlaybackWorkflow(apiService)
-                    } else {
-                        speak("שגיאה בהפעלת הקובץ")
-                    }
-                }
-
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY) {
-                        Log.d("VIA_Audio", "Playback READY and streaming successfully.")
-                        progressJob?.cancel()
-                        progressJob = lifecycleScope.launch {
-                            Log.d("VIA_System", "Background progress tracker started.")
-                            while (mediaPlayer == this@apply) {
-                                if (isPlaying && duration > 0) {
-                                    val progress = currentPosition.toFloat() / duration
-                                    val currentPath = audioQueue[currentAudioIndex].path
-
-                                    if (progress >= 0.98f && !prefs.getBoolean("heard_$currentPath", false)) {
-                                        prefs.edit { putBoolean("heard_$currentPath", true) }
-                                        syncHeardStatusToDropbox(currentPath)
-                                        Log.i("VIA_Audio", "Auto-marked track as HEARD at 98% completion.")
-                                    }
-                                }
-                                kotlinx.coroutines.delay(500)
-                            }
-                        }
-                    } else if (playbackState == Player.STATE_ENDED) {
-                        val currentPath = audioQueue[currentAudioIndex].path
-                        if (!prefs.getBoolean("heard_$currentPath", false)) {
-                            prefs.edit { putBoolean("heard_$currentPath", true) }
-                            syncHeardStatusToDropbox(currentPath)
-                        }
-
-                        keepScreenAwake(false)
-                        var targetIndex = -1
-
-                        for (i in currentAudioIndex + 1 until audioQueue.size) {
-                            if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
-                                targetIndex = i
-                                break
-                            }
-                        }
-
-                        if (targetIndex != -1) {
-                            currentAudioIndex = targetIndex
-                            updateSlidingWindow()
-                            mediaPlayer?.release()
-                            mediaPlayer = null
-
-                            val cleanTitle = getCleanTitle(audioQueue[currentAudioIndex].title)
-                            shouldAutoPlayNext = true
-                            speak("הקובץ הסתיים, עובר לקובץ הבא. שם הקובץ הינו $cleanTitle")
-                        }
-                    }
-                }
-
-                override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
-                    super.onPlaybackSuppressionReasonChanged(playbackSuppressionReason)
-                    if (playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS) {
-                        this@apply.pause()
-                        val rawPosition = this@apply.currentPosition
-                        val adjustedPosition = if (rawPosition > 3000) rawPosition - 3000 else 0
-                        this@apply.seekTo(adjustedPosition)
-
-                        val audioPath = audioQueue[currentAudioIndex].path
-                        prefs.edit {
-                            putInt("last_pos_$audioPath", adjustedPosition.toInt())
-                            putInt("last_active_index", currentAudioIndex)
-                        }
-                        keepScreenAwake(false)
-                        if (wakeLock?.isHeld == true) wakeLock?.release()
-                    }
-                }
-            })
-            prepare()
+            // Tells the Service Engine to start streaming!
+            controller.prepare()
+            controller.play()
         }
     }
 
     // Function that handles pausing audio.
     private fun pauseAudio() {
-        mediaPlayer?.let { player ->
+        mediaController?.let { player ->
             if (player.isPlaying) {
                 // Gets the audio path
                 val audioPath = audioQueue[currentAudioIndex].path
@@ -991,7 +880,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function that handles fetching the direct streaming link and starting playback
-    private fun startPlaybackWorkflow(apiService: ApiService) {
+    private fun startPlaybackWorkflow() {
         lifecycleScope.launch {
             try {
                 // Validates the token before fetching the link
@@ -1005,7 +894,7 @@ class MainActivity : AppCompatActivity() {
                 val linkResponse = apiService.getTemporaryLink(token, TempLinkRequest(currentFile.path))
 
                 Log.i("VIA_Dropbox", "Streaming link fetched successfully.")
-                playAudio(linkResponse.link, apiService) // Now we play the valid link
+                playAudio(linkResponse.link) // Now we play the valid link
             } catch (e: Exception) {
                 Log.e("VIA_Dropbox", "Failed to fetch streaming link: ${e.message}")
                 speak("שגיאה בהפעלת הקובץ")
@@ -1253,15 +1142,131 @@ class MainActivity : AppCompatActivity() {
         vibrate()
         pauseAudio() // This saves the current index and the 3-second-rewound position
 
-        // finishAndRemoveTask() closes the activity and removes it from the 'Recents' screen
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            finishAndRemoveTask()
-        } else {
-            finish()
-        }
+        finishAndRemoveTask()
 
         // Ensures the process is actually killed
-        System.exit(0)
+        kotlin.system.exitProcess(0)
+    }
+
+    override fun onStart() {
+        super.onStart()
+
+        // Points to your PlaybackService
+        val sessionToken = SessionToken(
+            this,
+            ComponentName(this, PlaybackService::class.java)
+        )
+
+        // Asks the OS for the Remote Control
+        controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
+
+        // Waits for the connection to finish
+        controllerFuture?.addListener({
+            try {
+                // Once connected, assign the finished controller to our global variable!
+                mediaController = controllerFuture?.get()
+                Log.d("VIA_System", "MediaController successfully bound to PlaybackService.")
+
+                // ==========================================
+                // ATTACHES THE LISTENER TO THE CONTROLLER
+                // ==========================================
+                mediaController?.addListener(object : Player.Listener {
+                    override fun onPlayerError(error: PlaybackException) {
+                        Log.e("VIA_Audio", "ExoPlayer error: ${error.errorCodeName} - ${error.message}")
+
+                        // Catches expired Dropbox links, dropped Wi-Fi,
+                        // and Android Doze mode silently severing the background network connection (Timeout/Unspecified).
+                        if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
+                            error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+                            error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
+                            error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED) {
+
+                            Log.w("VIA_Audio", "Stream starved. Auto-recovering...")
+
+                            // Pauses to safely write the exact crash timestamp to SharedPreferences
+                            pauseAudio()
+
+                            // Re-triggers the auth flow to get a fresh link and resume
+                            startPlaybackWorkflow()
+                        } else {
+                            speak("שגיאה בהפעלת הקובץ")
+                        }
+                    }
+
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY) {
+                            Log.d("VIA_Audio", "Playback READY and streaming successfully.")
+                            progressJob?.cancel()
+                            progressJob = lifecycleScope.launch {
+                                Log.d("VIA_System", "Background progress tracker started.")
+                                // Loops while the controller exists and is playing
+                                while (mediaController != null) {
+                                    val player = mediaController ?: break
+                                    if (player.isPlaying && player.duration > 0) {
+                                        val progress = player.currentPosition.toFloat() / player.duration
+                                        val currentPath = audioQueue[currentAudioIndex].path
+
+                                        if (progress >= 0.98f && !prefs.getBoolean("heard_$currentPath", false)) {
+                                            prefs.edit { putBoolean("heard_$currentPath", true) }
+                                            syncHeardStatusToDropbox(currentPath)
+                                            Log.i("VIA_Audio", "Auto-marked track as HEARD at 98% completion.")
+                                        }
+                                    }
+                                    kotlinx.coroutines.delay(500)
+                                }
+                            }
+                        } else if (playbackState == Player.STATE_ENDED) {
+                            val currentPath = audioQueue[currentAudioIndex].path
+                            if (!prefs.getBoolean("heard_$currentPath", false)) {
+                                prefs.edit { putBoolean("heard_$currentPath", true) }
+                                syncHeardStatusToDropbox(currentPath)
+                            }
+
+                            keepScreenAwake(false)
+                            var targetIndex = -1
+
+                            for (i in currentAudioIndex + 1 until audioQueue.size) {
+                                if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
+                                    targetIndex = i
+                                    break
+                                }
+                            }
+
+                            if (targetIndex != -1) {
+                                currentAudioIndex = targetIndex
+                                updateSlidingWindow()
+
+                                // We no longer release the controller here, we just prep the next track!
+                                val cleanTitle = getCleanTitle(audioQueue[currentAudioIndex].title)
+                                shouldAutoPlayNext = true
+                                speak("הקובץ הסתיים, עובר לקובץ הבא. שם הקובץ הינו $cleanTitle")
+                            }
+                        }
+                    }
+
+                    override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                        super.onPlaybackSuppressionReasonChanged(playbackSuppressionReason)
+                        if (playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS) {
+                            mediaController?.pause()
+                            val rawPosition = mediaController?.currentPosition ?: 0L
+                            val adjustedPosition = if (rawPosition > 3000) rawPosition - 3000 else 0
+                            mediaController?.seekTo(adjustedPosition)
+
+                            val audioPath = audioQueue[currentAudioIndex].path
+                            prefs.edit {
+                                putInt("last_pos_$audioPath", adjustedPosition.toInt())
+                                putInt("last_active_index", currentAudioIndex)
+                            }
+                            keepScreenAwake(false)
+                            if (wakeLock?.isHeld == true) wakeLock?.release()
+                        }
+                    }
+                })
+
+            } catch (e: Exception) {
+                Log.e("VIA_System", "Failed to bind MediaController: ${e.message}")
+            }
+        }, ContextCompat.getMainExecutor(this)) // Forces the result onto the Main UI Thread
     }
 
     // Performs a silent library refresh when the app is brought back to the screen
@@ -1286,8 +1291,15 @@ class MainActivity : AppCompatActivity() {
     // exact moment the app is completely hidden from the user's screen.
     override fun onStop() {
         Log.d("VIA_System", "onStop triggered. App sent to background.")
+
+        // Lets go of the remote control so the Service can keep running in the background!
+        controllerFuture?.let { future ->
+            MediaController.releaseFuture(future)
+            mediaController = null
+        }
+
         super.onStop()
-    } // Acts as a guard against closing the app before pausing the audio file
+    }
 }
 
 // Object that handles the permanent authentication with Dropbox

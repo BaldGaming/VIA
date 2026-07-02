@@ -122,6 +122,7 @@ dependencies {
     // JSON translator
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
 
+    implementation("androidx.media3:media3-session:1.9.2")
     implementation("androidx.media3:media3-exoplayer:1.9.2") // media player shit
     implementation("androidx.media3:media3-ui:1.9.2") // media player shit
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2") // for the suspend keyword found in ApiServices.kt
