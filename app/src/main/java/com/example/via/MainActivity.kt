@@ -53,11 +53,14 @@ class MainActivity : AppCompatActivity() {
     private var voicePlayer: MediaPlayer? = null
     private var fallbackTts: TextToSpeech? = null
     private var ttsJob: kotlinx.coroutines.Job? = null
-    private var progressJob: kotlinx.coroutines.Job? = null // Tracks playback progress to auto-mark files
+    private var progressJob: kotlinx.coroutines.Job? =
+        null // Tracks playback progress to auto-mark files
+    private var isVoiceBusy: Boolean = false
 
     // Media controller & Shared preferences memory
     private var mediaController: MediaController? = null
-    private var controllerFuture: ListenableFuture<MediaController>? = null // Tracks the connection to the background service
+    private var controllerFuture: ListenableFuture<MediaController>? =
+        null // Tracks the connection to the background service
     private lateinit var prefs: SharedPreferences
     private lateinit var apiService: ApiService
 
@@ -93,13 +96,17 @@ class MainActivity : AppCompatActivity() {
                 fallbackTts?.setLanguage(Locale.forLanguageTag("he"))
 
                 // Listens to exactly when the fallback voice starts and stops
-                fallbackTts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                fallbackTts?.setOnUtteranceProgressListener(object :
+                    android.speech.tts.UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         keepScreenAwake(true)
                     }
+
                     override fun onDone(utteranceId: String?) {
+                        isVoiceBusy = false // Sets the isVoiceBusy flag
                         keepScreenAwake(false)
                     }
+
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
                         keepScreenAwake(false)
@@ -120,7 +127,11 @@ class MainActivity : AppCompatActivity() {
                     finish() // Closes the app completely
                 } else {
                     // Notifies the user to press again
-                    Toast.makeText(this@MainActivity, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Press back again to exit",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
                 // Updates the memory to the time of the latest press
                 pressedTime = System.currentTimeMillis()
@@ -144,10 +155,14 @@ class MainActivity : AppCompatActivity() {
         // Buttons
         val playBtn = findViewById<Button>(R.id.button1) // Play / Pause / Marked as heard.
         val titleBtn = findViewById<Button>(R.id.button) // Read title / Read buttons.
-        val forwardBtn = findViewById<Button>(R.id.button3) // Next channel / Refresh list (with Yellow).
-        val rewindBtn = findViewById<Button>(R.id.button2) // Previous channel / Goto start / Refresh list (with Blue).
-        val nextBtn = findViewById<Button>(R.id.button5) // Next file / Next unheard / Exit app (with White).
-        val previousBtn = findViewById<Button>(R.id.button4) // Previous file / Start of list / Exit app (with Pink).
+        val forwardBtn =
+            findViewById<Button>(R.id.button3) // Next channel / Refresh list (with Yellow).
+        val rewindBtn =
+            findViewById<Button>(R.id.button2) // Previous channel / Goto start / Refresh list (with Blue).
+        val nextBtn =
+            findViewById<Button>(R.id.button5) // Next file / Next unheard / Exit app (with White).
+        val previousBtn =
+            findViewById<Button>(R.id.button4) // Previous file / Start of list / Exit app (with Pink).
 
         // Wakelock object
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -237,10 +252,10 @@ class MainActivity : AppCompatActivity() {
                     Log.i("VIA_System", "File manually marked as HEARD: $currentPath")
                     speak("סומן כהושלם")
                     syncHeardStatusToDropbox(currentPath) // Call sync function
-                }
-                else {
+                } else {
                     Log.i("VIA_System", "File manually marked as UNHEARD: $currentPath")
                     speak("הסימון הוסר")
+                    unsyncHeardStatusToDropbox(currentPath) // Call unsync function
                 }
             }
 
@@ -267,7 +282,6 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-
         /**
          * Next Channel logic
          */
@@ -285,8 +299,9 @@ class MainActivity : AppCompatActivity() {
                 refreshLibrary(apiService)
                 speak("האפליקציה בודקת אם יש עדכון ברשימת הקבצים")
                 true
-            }
-            else {true} // Does nothing because long pressing also does nothing
+            } else {
+                true
+            } // Does nothing because long pressing also does nothing
         }
 
 
@@ -307,8 +322,7 @@ class MainActivity : AppCompatActivity() {
                 refreshLibrary(apiService)
                 speak("האפליקציה בודקת אם יש עדכון ברשימת הקבצים")
                 true
-            }
-            else {
+            } else {
                 // Pauses the audio so it doesn't overlap with the TTS
                 pauseAudio()
 
@@ -453,7 +467,7 @@ class MainActivity : AppCompatActivity() {
             (num / 100).toInt() // E.g. (1019 / 100) -> 10, AKA Channel 10.
             // E.g. (2510 / 100) -> 25, AKA Channel 25
 
-        }.filter { it in 10..99}.toSortedSet().toList()
+        }.filter { it in 10..99 }.toSortedSet().toList()
 
         Log.d("VIA_System", "HopChannel: Detected active channels in library: $availableChannels")
 
@@ -474,7 +488,10 @@ class MainActivity : AppCompatActivity() {
             if (nextChannel != null) {
                 targetChannel = nextChannel
             } else {
-                Log.d("VIA_System", "HopChannel: User at max channel ($currentChannel), cannot go up.")
+                Log.d(
+                    "VIA_System",
+                    "HopChannel: User at max channel ($currentChannel), cannot go up."
+                )
                 vibrate()
                 speak("ערוץ מספר $currentChannel הוא הערוץ הגבוה ביותר כרגע")
                 return
@@ -485,7 +502,10 @@ class MainActivity : AppCompatActivity() {
             if (prevChannel != null) {
                 targetChannel = prevChannel
             } else {
-                Log.d("VIA_System", "HopChannel: User at min channel ($currentChannel), cannot go down.")
+                Log.d(
+                    "VIA_System",
+                    "HopChannel: User at min channel ($currentChannel), cannot go down."
+                )
                 vibrate()
                 speak("ערוץ מספר $currentChannel הוא הערוץ הנמוך ביותר כרגע")
                 return
@@ -513,12 +533,18 @@ class MainActivity : AppCompatActivity() {
             for (i in channelStartIndex..channelEndIndex) {
                 if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
                     targetIndex = i
-                    Log.d("VIA_System", "HopChannel: Found unheard track at index $targetIndex within Channel $targetChannel")
+                    Log.d(
+                        "VIA_System",
+                        "HopChannel: Found unheard track at index $targetIndex within Channel $targetChannel"
+                    )
                     break
                 }
             }
 
-            Log.d("VIA_System", "HopChannel: Jumping to index $targetIndex (Channel $targetChannel)")
+            Log.d(
+                "VIA_System",
+                "HopChannel: Jumping to index $targetIndex (Channel $targetChannel)"
+            )
             vibrate()
             pauseAudio()
 
@@ -529,8 +555,7 @@ class MainActivity : AppCompatActivity() {
             // Announces the new channel alongside it's name
             if (channelsMap.containsKey(targetChannel)) {
                 speak("ערוץ $targetChannel, ${channelsMap[targetChannel]}")
-            }
-            else {
+            } else {
                 // A fallback in case the channel isn't in index.txt
                 speak("ערוץ $targetChannel")
             }
@@ -542,7 +567,10 @@ class MainActivity : AppCompatActivity() {
     private fun getCleanTitle(rawTitle: String): String {
         return rawTitle
             .substringBeforeLast(".") // Removes .mp3
-            .replace(Regex("_"), " .") // Replaces underscore with a period and space for a natural TTS pause
+            .replace(
+                Regex("_"),
+                " ."
+            ) // Replaces underscore with a period and space for a natural TTS pause
     }
 
     // Function that reads the title and appends the heard status
@@ -620,11 +648,17 @@ class MainActivity : AppCompatActivity() {
         )
         staticStrings.forEach { prefetchTTS(it) }
 
-        Log.d("VIA_TTS", "Sliding window prefetch complete. Cache deletion disabled to preserve Azure tokens.")
+        Log.d(
+            "VIA_TTS",
+            "Sliding window prefetch complete. Cache deletion disabled to preserve Azure tokens."
+        )
     }
 
     // TTS function
     private fun speak(text: String) {
+        // Sets the isVoiceBusy flag
+        isVoiceBusy = true
+
         // Cancels active TTS requests
         ttsJob?.cancel()
 
@@ -726,6 +760,7 @@ class MainActivity : AppCompatActivity() {
         voicePlayer = MediaPlayer().apply {
             setDataSource(file.absolutePath)
             setOnCompletionListener {
+                isVoiceBusy = false // Sets the isVoiceBusy flag
                 keepScreenAwake(false)
 
                 // Checks if the system is waiting to autoplay the next track
@@ -784,11 +819,15 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val response = azureRetrofit.getAzureTTS(BuildConfig.AZURE_TTS_KEY, ssml = requestBody)
+                val response =
+                    azureRetrofit.getAzureTTS(BuildConfig.AZURE_TTS_KEY, ssml = requestBody)
                 if (response.isSuccessful) {
                     response.body()?.bytes()?.let { audioBytes ->
                         FileOutputStream(cachedVoiceFile).use { it.write(audioBytes) }
-                        Log.d("VIA_TTS", "Silently pre-fetched TTS to local storage for hash: ${text.hashCode()}")
+                        Log.d(
+                            "VIA_TTS",
+                            "Silently pre-fetched TTS to local storage for hash: ${text.hashCode()}"
+                        )
                     }
                 }
             } catch (_: Exception) {
@@ -834,7 +873,8 @@ class MainActivity : AppCompatActivity() {
             controller.setMediaItem(mediaItem)
 
             // Restores position
-            val savedPosition = prefs.getInt("last_pos_${audioQueue[currentAudioIndex].path}", 0).toLong()
+            val savedPosition =
+                prefs.getInt("last_pos_${audioQueue[currentAudioIndex].path}", 0).toLong()
             Log.d("VIA_Audio", "Restoring track position from prefs: $savedPosition ms")
             controller.seekTo(savedPosition)
 
@@ -874,7 +914,10 @@ class MainActivity : AppCompatActivity() {
                 // Safely releases the CPU WakeLock so it doesn't drain the battery
                 if (wakeLock?.isHeld == true) wakeLock?.release()
 
-                Log.d("VIA_Audio", "Track PAUSED at $rawPosition ms, saved overlapping position as $adjustedPosition ms")
+                Log.d(
+                    "VIA_Audio",
+                    "Track PAUSED at $rawPosition ms, saved overlapping position as $adjustedPosition ms"
+                )
             }
         }
     }
@@ -891,7 +934,8 @@ class MainActivity : AppCompatActivity() {
                 Log.d("VIA_Dropbox", "Requesting temporary streaming link for: ${currentFile.path}")
 
                 // Asks Dropbox for a direct streaming link
-                val linkResponse = apiService.getTemporaryLink(token, TempLinkRequest(currentFile.path))
+                val linkResponse =
+                    apiService.getTemporaryLink(token, TempLinkRequest(currentFile.path))
 
                 Log.i("VIA_Dropbox", "Streaming link fetched successfully.")
                 playAudio(linkResponse.link) // Now we play the valid link
@@ -927,7 +971,8 @@ class MainActivity : AppCompatActivity() {
 
                 // Parsing logic
                 if (indexResponse.isSuccessful) {
-                    val indexText = indexResponse.body()?.string() // This is a (potentially) long ass String that will be parsed.
+                    val indexText = indexResponse.body()
+                        ?.string() // This is a (potentially) long ass String that will be parsed.
 
                     // Splits the massive string into a List of individual lines
                     val lines = indexText?.split("\n") ?: emptyList()
@@ -949,9 +994,13 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     Log.d("VIA_Index", "Successfully parsed index.txt!")
-                }
-                else {
-                    Log.e("VIA_Index", "Failed to download index.txt: HTTP ${indexResponse.code()} - ${indexResponse.errorBody()?.string()}")
+                } else {
+                    Log.e(
+                        "VIA_Index",
+                        "Failed to download index.txt: HTTP ${indexResponse.code()} - ${
+                            indexResponse.errorBody()?.string()
+                        }"
+                    )
                 }
 
                 // Log the channelMap
@@ -975,7 +1024,8 @@ class MainActivity : AppCompatActivity() {
                         return@forEach
 
                     if (nameLower.endsWith(".mp3") || nameLower.endsWith(".wav") ||
-                        nameLower.endsWith(".aac") || nameLower.endsWith(".m4a")) {
+                        nameLower.endsWith(".aac") || nameLower.endsWith(".m4a")
+                    ) {
                         audioQueue.add(AudioFile(title = entry.name, path = entry.pathDisplay))
                     }
                 }
@@ -1015,13 +1065,29 @@ class MainActivity : AppCompatActivity() {
 
                 // Calculates the difference between what we have in memory and what we currently have
                 val newFilesCount = audioQueue.size - lastKnownCount
-                Log.i("VIA_System", "Library synced. Total files: ${audioQueue.size}. Delta since last check: $newFilesCount")
+                Log.i(
+                    "VIA_System",
+                    "Library synced. Total files: ${audioQueue.size}. Delta since last check: $newFilesCount"
+                )
 
-                // Checks if the folder size is bigger than what we have stored in "prefs"
-                if (newFilesCount == 1) {
-                    speak("נוסף קובץ אחד חדש")
-                } else if (newFilesCount > 1) {
-                    speak("נוספו $newFilesCount קבצים חדשים")
+                // // Checks if the folder size is bigger than what we have stored in "prefs"
+                if (newFilesCount > 0) {
+
+                    // Kinda of a shitty solution for preventing the daily tips from overriding the "new files" tts, but eh, idc...
+                    while (isVoiceBusy) {
+                        Log.d(
+                            "VIA_TTS",
+                            "Waiting for Daily Tip to finish before announcing new files..."
+                        )
+                        kotlinx.coroutines.delay(1500) // Sleeps for a second and a half, then checks again
+                    }
+
+                    // Once the loop breaks (isVoiceBusy becomes false), announce the files
+                    if (newFilesCount == 1) {
+                        speak("נוסף קובץ אחד חדש")
+                    } else {
+                        speak("נוספו $newFilesCount קבצים חדשים")
+                    }
                 }
 
                 // Saves the current size for the next check cleanly
@@ -1046,11 +1112,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Creates a .h file
     private fun syncHeardStatusToDropbox(audioPath: String) {
         lifecycleScope.launch {
             try {
                 Log.d("VIA_Sync", "Attempting to create marker file on Dropbox for: $audioPath")
-                // THE FIX: Dropbox uses the 'content' subdomain for uploads
+                // Dropbox uses the 'content' subdomain for uploads
                 val apiService = Retrofit.Builder()
                     .baseUrl("https://content.dropboxapi.com/")
                     .addConverterFactory(GsonConverterFactory.create())
@@ -1090,13 +1157,58 @@ class MainActivity : AppCompatActivity() {
                     Log.i("VIA_Sync", "SUCCESS: Marker file successfully uploaded at $markerPath")
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    Log.e("VIA_Sync", "Dropbox Rejected Marker Upload: HTTP ${response.code()} - $errorBody")
+                    Log.e(
+                        "VIA_Sync",
+                        "Dropbox Rejected Marker Upload: HTTP ${response.code()} - $errorBody"
+                    )
                 }
             } catch (e: Exception) {
                 Log.e("VIA_Sync", "Sync Connection Error while uploading marker: ${e.message}")
             }
         }
     }
+
+    // Deletes a .h file
+    private fun unsyncHeardStatusToDropbox(audioPath: String) {
+        lifecycleScope.launch {
+            try {
+                Log.d("VIA_Sync", "Attempting to delete marker file on Dropbox for: $audioPath")
+                // Dropbox uses the standard 'api' subdomain for metadata and file management operations
+                val apiService = Retrofit.Builder()
+                    .baseUrl("https://api.dropboxapi.com/")
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
+                    .create(ApiService::class.java)
+
+                val token = DropboxAuth.getValidToken(apiService)
+                if (token.isEmpty()) return@launch
+
+                // Chops off the extension (e.g., .mp3) and replaces it with .h
+                val markerPath = audioPath.substringBeforeLast(".") + ".h"
+
+                // A route to be sent so that Retrofit can understand
+                val deleteMap = mapOf(
+                    "path" to markerPath
+                )
+
+                // Call the Api function, passing the token and the entire map
+                val response = apiService.deleteFile(token = token, body = deleteMap)
+
+                if (response.isSuccessful) {
+                    Log.i("VIA_Sync", "SUCCESS: Marker file successfully removed at $markerPath")
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e(
+                        "VIA_Sync",
+                        "Dropbox Rejected Marker Delete: HTTP ${response.code()} - $errorBody"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("VIA_Sync", "Sync Connection Error while deleting marker: ${e.message}")
+            }
+        }
+    }
+
 
     private fun checkAndPlayDailyInstructions() {
         // We leave the 4-hour shift in place, but it won't affect our minute-test
@@ -1109,7 +1221,10 @@ class MainActivity : AppCompatActivity() {
         val lastPlayedDate = prefs.getString("last_instruction_date", "")
 
         if (logicalToday != lastPlayedDate) {
-            Log.i("VIA_Instructions", "New logical day detected ($logicalToday). Triggering daily instruction tip.")
+            Log.i(
+                "VIA_Instructions",
+                "New logical day detected ($logicalToday). Triggering daily instruction tip."
+            )
 
             // List of all possible "tips"
             val allInstructions = listOf(
@@ -1133,7 +1248,10 @@ class MainActivity : AppCompatActivity() {
                 putString("last_instruction_date", logicalToday)
             }
         } else {
-            Log.d("VIA_Instructions", "Daily tip skipped. Already played for logical day: $logicalToday")
+            Log.d(
+                "VIA_Instructions",
+                "Daily tip skipped. Already played for logical day: $logicalToday"
+            )
         }
     }
 
@@ -1172,14 +1290,18 @@ class MainActivity : AppCompatActivity() {
                 // ==========================================
                 mediaController?.addListener(object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
-                        Log.e("VIA_Audio", "ExoPlayer error: ${error.errorCodeName} - ${error.message}")
+                        Log.e(
+                            "VIA_Audio",
+                            "ExoPlayer error: ${error.errorCodeName} - ${error.message}"
+                        )
 
                         // Catches expired Dropbox links, dropped Wi-Fi,
                         // and Android Doze mode silently severing the background network connection (Timeout/Unspecified).
                         if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
                             error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
                             error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
-                            error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED) {
+                            error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+                        ) {
 
                             Log.w("VIA_Audio", "Stream starved. Auto-recovering...")
 
@@ -1203,13 +1325,21 @@ class MainActivity : AppCompatActivity() {
                                 while (mediaController != null) {
                                     val player = mediaController ?: break
                                     if (player.isPlaying && player.duration > 0) {
-                                        val progress = player.currentPosition.toFloat() / player.duration
+                                        val progress =
+                                            player.currentPosition.toFloat() / player.duration
                                         val currentPath = audioQueue[currentAudioIndex].path
 
-                                        if (progress >= 0.98f && !prefs.getBoolean("heard_$currentPath", false)) {
+                                        if (progress >= 0.98f && !prefs.getBoolean(
+                                                "heard_$currentPath",
+                                                false
+                                            )
+                                        ) {
                                             prefs.edit { putBoolean("heard_$currentPath", true) }
                                             syncHeardStatusToDropbox(currentPath)
-                                            Log.i("VIA_Audio", "Auto-marked track as HEARD at 98% completion.")
+                                            Log.i(
+                                                "VIA_Audio",
+                                                "Auto-marked track as HEARD at 98% completion."
+                                            )
                                         }
                                     }
                                     kotlinx.coroutines.delay(500)
@@ -1284,15 +1414,17 @@ class MainActivity : AppCompatActivity() {
             .build()
         val apiService = retrofit.create(ApiService::class.java)
 
+        // Call refreshLibrary (and notify user if new content exists, if need be)
         refreshLibrary(apiService)
+
     }
 
     // Function that gets triggered automatically by Android the
-    // exact moment the app is completely hidden from the user's screen.
+// exact moment the app is completely hidden from the user's screen.
     override fun onStop() {
         Log.d("VIA_System", "onStop triggered. App sent to background.")
 
-        // Lets go of the remote control so the Service can keep running in the background!
+        // Let's go of the remote control so the Service can keep running in the background
         controllerFuture?.let { future ->
             MediaController.releaseFuture(future)
             mediaController = null

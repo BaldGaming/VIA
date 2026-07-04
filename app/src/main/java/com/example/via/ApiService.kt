@@ -69,7 +69,7 @@ interface ApiService {
         @Body ssml: okhttp3.RequestBody
     ): Response<ResponseBody>
 
-    // Uploads a file (or empty marker) directly to a specified Dropbox path.
+    // Uploads a file (or empty marker) to a specified Dropbox path.
     @Headers("Content-Type: application/octet-stream")
     @POST("2/files/upload")
     suspend fun uploadFile(
@@ -77,6 +77,14 @@ interface ApiService {
         @Header("Dropbox-API-Arg") args: String, // Contains the path
         @Body fileBody: RequestBody
     ): Response<Unit>
+
+    // Deletes a file (or empty marker)
+    @POST("2/files/delete_v2")
+    suspend fun deleteFile(
+        @Header("Authorization") token: String,
+        @Header("Content-Type") contentType: String = "application/json",
+        @Body body: Map<String, String>
+    ): retrofit2.Response<okhttp3.ResponseBody>
 
     // Fetch the "index.txt" file from DropBox
     @POST("2/files/download")
