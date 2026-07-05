@@ -20,6 +20,7 @@ import androidx.media3.session.SessionToken
 import android.content.ComponentName
 import com.google.common.util.concurrent.ListenableFuture
 import androidx.core.content.ContextCompat
+import androidx.media3.common.PlaybackParameters // Exoplayer voice speed
 
 import androidx.media3.common.MediaItem // Represents the audio file for ExoPlayer.
 import androidx.media3.common.Player // Handles ExoPlayer state changes.
@@ -56,6 +57,9 @@ class MainActivity : AppCompatActivity() {
     private var progressJob: kotlinx.coroutines.Job? =
         null // Tracks playback progress to auto-mark files
     private var isVoiceBusy: Boolean = false
+
+    // Tracks which track is currently physically loaded into the engine
+    private var loadedAudioIndex: Int = -1
 
     // Media controller & Shared preferences memory
     private var mediaController: MediaController? = null
@@ -209,8 +213,8 @@ class MainActivity : AppCompatActivity() {
                 Log.d("VIA_Audio", "Audio paused manually")
             }
 
-            // Checks if a song is actually loaded into the remote control
-            else if (currentPlayer != null && currentPlayer.currentMediaItem != null) {
+            // Checks if a song is loaded and verifies it matches the current UI index
+            else if (currentPlayer != null && currentPlayer.currentMediaItem != null && loadedAudioIndex == currentAudioIndex) {
                 currentPlayer.play()
 
                 // Starts wakeLock with a 4-hour timeout (14400000ms) to save battery if forgotten
@@ -714,7 +718,9 @@ class MainActivity : AppCompatActivity() {
         val ssmlText = """
             <speak version='1.0' xml:lang='he-IL'>
                 <voice xml:lang='he-IL' xml:gender='Male' name='he-IL-AvriNeural'>
-                    $text
+                    <prosody rate="+10%">
+                        $text
+                    </prosody>
                 </voice>
             </speak>
         """.trimIndent()
@@ -810,7 +816,9 @@ class MainActivity : AppCompatActivity() {
         val ssmlText = """
             <speak version='1.0' xml:lang='he-IL'>
                 <voice xml:lang='he-IL' xml:gender='Male' name='he-IL-AvriNeural'>
-                    $text
+                    <prosody rate="+10%">
+                        $text
+                    </prosody>
                 </voice>
             </speak>
         """.trimIndent()
@@ -869,6 +877,9 @@ class MainActivity : AppCompatActivity() {
         val mediaItem = MediaItem.fromUri(url)
 
         mediaController?.let { controller ->
+            // Marks this specific index as the currently loaded track
+            loadedAudioIndex = currentAudioIndex
+
             // Hands the track to the background engine
             controller.setMediaItem(mediaItem)
 
@@ -1285,9 +1296,12 @@ class MainActivity : AppCompatActivity() {
                 mediaController = controllerFuture?.get()
                 Log.d("VIA_System", "MediaController successfully bound to PlaybackService.")
 
-                // ==========================================
-                // ATTACHES THE LISTENER TO THE CONTROLLER
-                // ==========================================
+                // !!! (AS OF 05/7/2025 THIS IS NOT USED) !!!
+                // Sets the speed and pitch parameters for the ExoPlayer media controller
+                val playbackParameters = PlaybackParameters(1.0f, 1.0f) // Speed and pitch
+                mediaController?.playbackParameters = playbackParameters
+
+                // Attaches the listener to the controller
                 mediaController?.addListener(object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
                         Log.e(

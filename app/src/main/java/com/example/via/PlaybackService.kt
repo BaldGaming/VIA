@@ -1,5 +1,7 @@
 package com.example.via
 
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -15,6 +17,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     // Builder
+    @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
 
@@ -25,9 +28,10 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         // Build the engine with the strict Wake Modes included
-        player = ExoPlayer.Builder(this)
+        val player = ExoPlayer.Builder(this)
             .setAudioAttributes(audioAttributes, true)
             .setWakeMode(androidx.media3.common.C.WAKE_MODE_NETWORK)
+            .setSkipSilenceEnabled(true) // This skips over large parts of complete silence in audiobooks. I have no idea how this works. (true / false)
             .build()
 
         // Build the bridge to the OS
