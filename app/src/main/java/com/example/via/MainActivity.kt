@@ -1343,17 +1343,67 @@ class MainActivity : AppCompatActivity() {
                                             player.currentPosition.toFloat() / player.duration
                                         val currentPath = audioQueue[currentAudioIndex].path
 
-                                        if (progress >= 0.98f && !prefs.getBoolean(
-                                                "heard_$currentPath",
-                                                false
-                                            )
-                                        ) {
-                                            prefs.edit { putBoolean("heard_$currentPath", true) }
-                                            syncHeardStatusToDropbox(currentPath)
-                                            Log.i(
-                                                "VIA_Audio",
-                                                "Auto-marked track as HEARD at 98% completion."
-                                            )
+                                        // If the audio is under 30 minutes:
+                                        if (player.duration <= 1800000) {
+                                            if (progress >= 0.92f && !prefs.getBoolean(
+                                                    "heard_$currentPath",
+                                                    false
+                                                )
+                                            ) {
+                                                prefs.edit {
+                                                    putBoolean(
+                                                        "heard_$currentPath",
+                                                        true
+                                                    )
+                                                }
+                                                syncHeardStatusToDropbox(currentPath)
+                                                Log.i(
+                                                    "VIA_Audio",
+                                                    "Auto-marked track as HEARD at 92% completion."
+                                                )
+                                            }
+                                        }
+
+                                        // If the audio is greater than 30 but less than an hour
+                                        else if (player.duration in 1800001..3600000) {
+                                            if (progress >= 0.95f && !prefs.getBoolean(
+                                                    "heard_$currentPath",
+                                                    false
+                                                )
+                                            ) {
+                                                prefs.edit {
+                                                    putBoolean(
+                                                        "heard_$currentPath",
+                                                        true
+                                                    )
+                                                }
+                                                syncHeardStatusToDropbox(currentPath)
+                                                Log.i(
+                                                    "VIA_Audio",
+                                                    "Auto-marked track as HEARD at 95% completion."
+                                                )
+                                            }
+                                        }
+
+                                        // If the audio is greater than an hour
+                                        else if (player.duration > 3600000) {
+                                            if (progress >= 0.98f && !prefs.getBoolean(
+                                                    "heard_$currentPath",
+                                                    false
+                                                )
+                                            ) {
+                                                prefs.edit {
+                                                    putBoolean(
+                                                        "heard_$currentPath",
+                                                        true
+                                                    )
+                                                }
+                                                syncHeardStatusToDropbox(currentPath)
+                                                Log.i(
+                                                    "VIA_Audio",
+                                                    "Auto-marked track as HEARD at 98% completion."
+                                                )
+                                            }
                                         }
                                     }
                                     kotlinx.coroutines.delay(500)
