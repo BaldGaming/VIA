@@ -10,6 +10,7 @@
     android:padding="10dp"
     tools:context=".MainActivity">
 
+    <!-- Red Button -->
     <Button
         android:id="@+id/button"
         android:layout_width="0dp"
@@ -26,6 +27,7 @@
         app:layout_constraintStart_toEndOf="@+id/button1"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Green Button -->
     <Button
         android:id="@+id/button1"
         android:layout_width="0dp"
@@ -42,6 +44,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/button" />
 
+    <!-- Yellow Button -->
     <Button
         android:id="@+id/button2"
         android:layout_width="0dp"
@@ -58,6 +61,7 @@
         app:layout_constraintStart_toEndOf="@+id/button3"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Blue Button -->
     <Button
         android:id="@+id/button3"
         android:layout_width="0dp"
@@ -74,6 +78,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/button2" />
 
+    <!-- White Button -->
     <Button
         android:id="@+id/button4"
         android:layout_width="0dp"
@@ -90,6 +95,7 @@
         app:layout_constraintStart_toEndOf="@+id/button5"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Pink Button -->
     <Button
         android:id="@+id/button5"
         android:layout_width="0dp"
@@ -105,5 +111,17 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/button4" />
+
+    <!-- Admin Fragment -->
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/fragment_dev"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:elevation="10dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -40,10 +40,12 @@ import java.io.File // Handles creating the temporary audio file.
 import java.io.FileOutputStream // Handles writing the audio bytes to the file.
 import com.example.via.BuildConfig // Exposes the Azure keys from local.properties.
 import android.speech.tts.TextToSpeech // The fallback voice engine for offline use.
+import androidx.fragment.app.FragmentManager
 import java.util.Locale // Sets the fallback TTS language specifically to Hebrew.
 import org.json.JSONObject // Safely builds JSON requests for Dropbox markers.
 import java.text.SimpleDateFormat // Shit for daily reminders
 import java.util.Date
+import android.view.View // Fragment shit
 
 // Song data class
 data class AudioFile(val title: String, val path: String)
@@ -88,11 +90,24 @@ class MainActivity : AppCompatActivity() {
     private val dot = "<break time='1200ms'/>"
     private val comma = "<break time='600ms'/>"
 
+    // Tap counter for wanting to enter the admin screen
+    // and time since last tap counter
+    private var devTapCount = 0
+    private var lastTapTime: Long = 0
+
     // Initializes the main activity when the app launches
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+
+        // Initializes the admin fragment
+        if (savedInstanceState == null) {
+            supportFragmentManager.beginTransaction()
+                .setReorderingAllowed(true)
+                .add(R.id.fragment_dev, FragmentDev()) // The bucket ID, and the Fragment to put inside
+                .commit()
+        }
 
         // Initializes the offline fallback TTS engine
         fallbackTts = TextToSpeech(this) { status ->
@@ -254,7 +269,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (newHeardState) {
                     Log.i("VIA_System", "File manually marked as HEARD: $currentPath")
-                    speak("סומן כהושלם")
+                    speak("סומן כהושמע")
                     syncHeardStatusToDropbox(currentPath) // Call sync function
                 } else {
                     Log.i("VIA_System", "File manually marked as UNHEARD: $currentPath")
@@ -273,7 +288,28 @@ class MainActivity : AppCompatActivity() {
         titleBtn.setOnClickListener { // tap
             Log.d("VIA_Button", "Title tapped")
             vibrate()
-            readCurrentTitle()
+
+            val currentTime = System.currentTimeMillis()
+
+            // Check if the user tapped fast enough
+            if (currentTime - lastTapTime < 500) {
+                devTapCount++
+            } else {
+                devTapCount = 1
+            }
+
+            // Update the memory
+            lastTapTime = currentTime
+
+            // The counter check
+            if (devTapCount == 7) {
+                Log.d("VIA_System", "7 taps detected: Opening Admin screen.")
+                findViewById<View>(R.id.fragment_dev).visibility = View.VISIBLE
+                speak("מַצַּב מְנַהֵל הופְעָל$dot אִם זֹאת טָעוּת, תִּיצֹּר קֶשֶׁר עִם יַרְדֵּן.")
+                devTapCount = 0 // Reset the counter
+            } else {
+                readCurrentTitle()
+            }
         }
 
         titleBtn.setOnLongClickListener { // long press (about 500ms)
@@ -641,7 +677,7 @@ class MainActivity : AppCompatActivity() {
             "ערוץ לא קיים",
             "הגעת לסוף הרשימה",
             "חוזר לתחילת הרשימה",
-            "סומן כהושלם",
+            "סומן כהושמע",
             "הסימון הוסר",
             "שגיאה בהפעלת הקובץ",
             "חזרתא לתחילת הקובץ.",
