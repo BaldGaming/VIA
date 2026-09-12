@@ -95,6 +95,9 @@ class MainActivity : AppCompatActivity() {
     private var devTapCount = 0
     private var lastTapTime: Long = 0
 
+    // Mutex for stopping manual-marked-as-heard canceling out auto-marked-as-heard
+    private val lock = Any()
+
     // Initializes the main activity when the app launches
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -269,11 +272,11 @@ class MainActivity : AppCompatActivity() {
 
                 if (newHeardState) {
                     Log.i("VIA_System", "File manually marked as HEARD: $currentPath")
-                    speak("סומן כהושמע")
+                    speak("הקובץ סומן כהושמע")
                     syncHeardStatusToDropbox(currentPath) // Call sync function
                 } else {
                     Log.i("VIA_System", "File manually marked as UNHEARD: $currentPath")
-                    speak("הסימון הוסר")
+                    speak("הסימון התבטל")
                     unsyncHeardStatusToDropbox(currentPath) // Call unsync function
                 }
             }
@@ -677,8 +680,8 @@ class MainActivity : AppCompatActivity() {
             "ערוץ לא קיים",
             "הגעת לסוף הרשימה",
             "חוזר לתחילת הרשימה",
-            "סומן כהושמע",
-            "הסימון הוסר",
+            "הקובץ סומן כהושמע",
+            "הסימון התבטל",
             "שגיאה בהפעלת הקובץ",
             "חזרתא לתחילת הקובץ.",
             "רשימת הקבצים עדיין בטעינה, אנא המתן",
@@ -1135,6 +1138,12 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         speak("נוספו $newFilesCount קבצים חדשים")
                     }
+                } else {
+                    // Notify the user that no new files have been updated
+                    while (isVoiceBusy) {
+                        kotlinx.coroutines.delay(1500)
+                    }
+                    speak("אין קבצים חדשים")
                 }
 
                 // Saves the current size for the next check cleanly
