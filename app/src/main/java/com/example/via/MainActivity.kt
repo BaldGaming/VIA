@@ -1,51 +1,62 @@
 package com.example.via
 
-import android.os.Bundle // Passes the saved state when the app screen is created.
-import android.util.Log // Prints debugging messages to the Logcat console.
-import android.widget.Button // Hooks up the UI buttons (Play, Rewind, etc.).
-import androidx.activity.enableEdgeToEdge // Lets the app draw behind the status and navigation bars.
-import androidx.appcompat.app.AppCompatActivity // Acts as the base class for the main screen (MainActivity).
-import androidx.core.view.ViewCompat // Applies the window insets so UI doesn't overlap system bars.
-import androidx.core.view.WindowInsetsCompat // Measures the exact size of the system bars.
-import android.content.Context // Accesses system-level services (Preferences, Vibrator, Power).
-import android.os.Vibrator // Triggers haptic feedback on older Android versions.
-import android.os.VibrationEffect // Defines the exact strength and length of the vibration.
-import android.os.VibratorManager // Triggers haptic feedback on newer Android versions (Android 12+).
-import android.os.Build // Checks the device's Android version to pick the right vibrator service.
-import android.media.MediaPlayer // Streams and plays the local voice files.
+// --- CORE ANDROID & UI ---
+import android.content.Context                 // Accesses system-level services (Preferences, Vibrator, Power).
+import android.os.Bundle                       // Passes the saved state when the app screen is created.
+import android.util.Log                        // Prints debugging messages to the Logcat console.
+import android.view.View                       // Represents standard UI elements (used for Fragment visibility).
+import android.widget.Button                   // Hooks up the UI buttons (Play, Rewind, etc.).
+import android.widget.Toast                    // Shows the small pop-up message for the double-tap exit.
+import androidx.activity.OnBackPressedCallback // Handles modern system back-button gestures safely.
+import androidx.activity.enableEdgeToEdge      // Lets the app draw behind the status and navigation bars.
+import androidx.appcompat.app.AppCompatActivity// Acts as the base class for the main screen (MainActivity).
+import androidx.core.view.ViewCompat           // Applies window insets so UI doesn't overlap system bars.
+import androidx.core.view.WindowInsetsCompat   // Measures the exact size of the system bars.
 
-// Media3 Remote Control Imports
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
-import android.content.ComponentName
-import com.google.common.util.concurrent.ListenableFuture
-import androidx.core.content.ContextCompat
-import androidx.media3.common.PlaybackParameters // Exoplayer voice speed
+// --- HARDWARE & SYSTEM SERVICES ---
+import android.os.Build                        // Checks the Android version to pick the right vibrator service.
+import android.os.PowerManager                 // Controls the WakeLock to prevent the CPU from sleeping during playback.
+import android.os.VibrationEffect              // Defines the exact strength and length of the haptic vibration.
+import android.os.Vibrator                     // Triggers haptic feedback on older Android versions.
+import android.os.VibratorManager              // Triggers haptic feedback on newer Android versions (Android 12+).
+import android.content.SharedPreferences       // Saves simple data locally (timestamps, active index, heard status).
+import androidx.core.content.edit              // Simplifies saving data to SharedPreferences (KTX extension).
+import androidx.core.content.ContextCompat     // Safely grabs system executors or resources.
 
-import androidx.media3.common.MediaItem // Represents the audio file for ExoPlayer.
-import androidx.media3.common.Player // Handles ExoPlayer state changes.
-import androidx.media3.common.PlaybackException // Handles ExoPlayer errors.
-import android.content.SharedPreferences // Saves simple data locally (timestamps, last played song).
-import android.os.PowerManager // Controls the WakeLock to prevent the CPU from sleeping during playback.
-import retrofit2.Retrofit // The main tool to handle network requests to the Dropbox API.
-import retrofit2.converter.gson.GsonConverterFactory // Translates Dropbox's JSON text into Kotlin objects.
-import androidx.lifecycle.lifecycleScope // Runs background API tasks safely without crashing the UI.
-import kotlinx.coroutines.launch // Actually starts the background tasks (coroutines).
-import android.widget.Toast // Shows the little pop-up message for the double-tap exit.
-import androidx.activity.OnBackPressedCallback // Handles the modern system back-button gestures safely.
-import androidx.core.content.edit // Simplifies saving data to SharedPreferences (KTX extension).
-import okhttp3.MediaType.Companion.toMediaType // Converts strings to MediaType for Retrofit.
-import okhttp3.RequestBody.Companion.toRequestBody // Converts strings to RequestBody for Retrofit.
-import java.io.File // Handles creating the temporary audio file.
-import java.io.FileOutputStream // Handles writing the audio bytes to the file.
-import com.example.via.BuildConfig // Exposes the Azure keys from local.properties.
-import android.speech.tts.TextToSpeech // The fallback voice engine for offline use.
-import androidx.fragment.app.FragmentManager
-import java.util.Locale // Sets the fallback TTS language specifically to Hebrew.
-import org.json.JSONObject // Safely builds JSON requests for Dropbox markers.
-import java.text.SimpleDateFormat // Shit for daily reminders
-import java.util.Date
-import android.view.View // Fragment shit
+// --- AUDIO & MEDIA PLAYBACK ---
+import android.media.MediaPlayer               // Streams and plays the downloaded local TTS voice files.
+import android.media.SoundPool                 // Caches and plays short, zero-latency UI sound effects (Jingles).
+import android.speech.tts.TextToSpeech         // The native offline fallback voice engine.
+
+// --- MEDIA3 (EXOPLAYER) BACKGROUND STREAMING ---
+import androidx.media3.common.MediaItem        // Represents the audio file URL for ExoPlayer to stream.
+import androidx.media3.common.PlaybackException// Handles ExoPlayer network errors (timeouts, dropped connections).
+import androidx.media3.common.PlaybackParameters// Controls ExoPlayer playback speed and pitch.
+import androidx.media3.common.Player           // The interface that listens to playback state changes (Playing, Ended).
+import androidx.media3.session.MediaController // The "remote control" that talks to your background PlaybackService.
+import androidx.media3.session.SessionToken    // The secure key used to connect the MediaController to the Service.
+import android.content.ComponentName           // Specifies the exact PlaybackService class to connect to.
+import com.google.common.util.concurrent.ListenableFuture // A concurrency tool that waits for the MediaController to connect.
+
+// --- ASYNC & COROUTINES (BACKGROUND WORKERS) ---
+import androidx.lifecycle.lifecycleScope       // Runs background API tasks safely without crashing the UI.
+import kotlinx.coroutines.launch               // The specific command that starts the background coroutine.
+
+// --- NETWORKING (RETROFIT & DROPBOX/AZURE) ---
+import retrofit2.Retrofit                      // The main library used to send HTTP requests to APIs.
+import retrofit2.converter.gson.GsonConverterFactory // Translates JSON network responses directly into Kotlin objects.
+import okhttp3.MediaType.Companion.toMediaType // Converts strings into HTTP media types.
+import okhttp3.RequestBody.Companion.toRequestBody // Converts raw strings (like SSML) into HTTP request payloads.
+import org.json.JSONObject                     // Safely builds JSON objects (used for formatting Dropbox .h marker requests).
+
+// --- FILE SYSTEM (LOCAL TTS CACHE) ---
+import java.io.File                            // Represents a file or folder path on the device.
+import java.io.FileOutputStream                // Handles writing raw downloaded audio bytes into the local file.
+
+// --- UTILS (DATES & LANGUAGES) ---
+import java.text.SimpleDateFormat              // Formats dates to track daily instruction limits and monthly Azure quotas.
+import java.util.Date                          // Represents a specific moment in time.
+import java.util.Locale                        // Sets the regional language explicitly (Hebrew) for the fallback engine.
 
 // Song data class
 data class AudioFile(val title: String, val path: String)
@@ -95,8 +106,12 @@ class MainActivity : AppCompatActivity() {
     private var devTapCount = 0
     private var lastTapTime: Long = 0
 
-    // Mutex for stopping manual-marked-as-heard canceling out auto-marked-as-heard
-    private val lock = Any()
+    // Prevents double-syncing if multi-touch triggers twice
+    private var isRefreshing = false
+
+    // SoundPool player
+    private var soundPool: SoundPool? = null
+    private var jingleId: Int = 0
 
     // Initializes the main activity when the app launches
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -199,6 +214,23 @@ class MainActivity : AppCompatActivity() {
 
         // API instance
         apiService = retrofit.create(ApiService::class.java)
+
+        // Tell Android what kind of audio this is
+        val audioAttributes = android.media.AudioAttributes.Builder()
+            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build()
+
+        // Build the SoundPool engine
+        soundPool = SoundPool.Builder()
+            .setMaxStreams(1) // Only need 1 stream for a single jingle
+            .setAudioAttributes(audioAttributes)
+            .build()
+
+        // Loads the MP3 from res/raw into RAM and save its ID
+        soundPool?.let { pool ->
+            jingleId = pool.load(this, R.raw.short_jingle, 1)
+        }
 
         /**
          * Play logic
@@ -311,7 +343,10 @@ class MainActivity : AppCompatActivity() {
                 speak("מַצַּב מְנַהֵל הופְעָל$dot אִם זֹאת טָעוּת, תִּיצֹּר קֶשֶׁר עִם יַרְדֵּן.")
                 devTapCount = 0 // Reset the counter
             } else {
-                readCurrentTitle()
+                // Read the title, and play the jingle when it finishes
+                readCurrentTitle {
+                    soundPool?.play(jingleId, 1f, 1f, 0, 0, 1f)
+                }
             }
         }
 
@@ -339,7 +374,7 @@ class MainActivity : AppCompatActivity() {
 
             if (rewindBtn.isPressed) {
                 Log.d("VIA_System", "Dual-hold detected: Refreshing audio list")
-                refreshLibrary(apiService)
+                refreshLibrary(apiService, true) // true means user requested it
                 speak("האפליקציה בודקת אם יש עדכון ברשימת הקבצים")
                 true
             } else {
@@ -362,7 +397,7 @@ class MainActivity : AppCompatActivity() {
 
             if (forwardBtn.isPressed) {
                 Log.d("VIA_System", "Dual-hold detected: Refreshing audio list")
-                refreshLibrary(apiService)
+                refreshLibrary(apiService, true) // true means user requested it
                 speak("האפליקציה בודקת אם יש עדכון ברשימת הקבצים")
                 true
             } else {
@@ -401,7 +436,11 @@ class MainActivity : AppCompatActivity() {
                 currentAudioIndex++
 
                 updateSlidingWindow()
-                readCurrentTitle()
+
+                // Read title, and play the jingle when it finishes
+                readCurrentTitle {
+                    soundPool?.play(jingleId, 1f, 1f, 0, 0, 1f)
+                }
 
             } else {
                 speak("הגעת לסוף הרשימה")
@@ -467,7 +506,11 @@ class MainActivity : AppCompatActivity() {
                 currentAudioIndex--
 
                 updateSlidingWindow()
-                readCurrentTitle()
+
+                // Read title, and play the jingle when it finishes
+                readCurrentTitle {
+                    soundPool?.play(jingleId, 1f, 1f, 0, 0, 1f)
+                }
 
             } else {
                 speak("הגעת לתחילת הרשימה")
@@ -617,7 +660,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function that reads the title and appends the heard status
-    private fun readCurrentTitle() {
+    private fun readCurrentTitle(onComplete: (() -> Unit)? = null) {
         if (audioQueue.isEmpty()) {
             speak("רשימת הקבצים ריקה")
             return
@@ -628,9 +671,9 @@ class MainActivity : AppCompatActivity() {
         val isHeard = prefs.getBoolean("heard_$currentPath", false)
 
         if (isHeard) {
-            speak("כבר האזנת לקובץ זה. שם הקובץ הינו $cleanTitle.")
+            speak("כבר האזנת לקובץ זה. שם הקובץ הינו $cleanTitle.", onComplete)
         } else {
-            speak("שם הקובץ הינו $cleanTitle")
+            speak("שם הקובץ הינו $cleanTitle", onComplete)
         }
     }
 
@@ -698,7 +741,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // TTS function
-    private fun speak(text: String) {
+    private fun speak(text: String, onComplete: (() -> Unit)? = null) {
         // Sets the isVoiceBusy flag
         isVoiceBusy = true
 
@@ -723,7 +766,7 @@ class MainActivity : AppCompatActivity() {
         // Plays instantly if the file is already downloaded
         if (cachedVoiceFile.exists()) {
             Log.i("VIA_TTS", "Local Cache HIT for text hash: ${text.hashCode()}")
-            playVoiceFile(cachedVoiceFile)
+            playVoiceFile(cachedVoiceFile, onComplete)
             return
         }
 
@@ -782,7 +825,7 @@ class MainActivity : AppCompatActivity() {
                         FileOutputStream(cachedVoiceFile).use { it.write(audioBytes) }
 
                         // Plays the voice
-                        playVoiceFile(cachedVoiceFile)
+                        playVoiceFile(cachedVoiceFile, onComplete)
                     }
                 } else {
                     Log.e("VIA_TTS", "Azure Error: ${response.code()} - ${response.message()}")
@@ -801,12 +844,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function that handles playing the local TTS file.
-    private fun playVoiceFile(file: File) {
+    private fun playVoiceFile(file: File, onComplete: (() -> Unit)? = null) {
         voicePlayer = MediaPlayer().apply {
             setDataSource(file.absolutePath)
             setOnCompletionListener {
                 isVoiceBusy = false // Sets the isVoiceBusy flag
                 keepScreenAwake(false)
+
+                // Fire the callback
+                onComplete?.invoke()
 
                 // Checks if the system is waiting to autoplay the next track
                 if (shouldAutoPlayNext) {
@@ -889,6 +935,7 @@ class MainActivity : AppCompatActivity() {
         ttsJob?.cancel()
         progressJob?.cancel() // Stops the background progress tracker
         voicePlayer?.release()
+        soundPool?.release()
         mediaController?.release()
         fallbackTts?.shutdown()
         super.onDestroy()
@@ -997,7 +1044,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Refreshes the library of audio files
-    private fun refreshLibrary(apiService: ApiService) {
+    private fun refreshLibrary(apiService: ApiService, isManualRefresh: Boolean = false) {
+
+        // If it's already running, instantly reject the duplicate request
+        if (isRefreshing) {
+            Log.w("VIA_System", "Refresh already in progress. Ignoring duplicate multi-touch call.")
+            return
+        }
+
+        // "Lock the door"
+        isRefreshing = true
+
         lifecycleScope.launch {
             try {
                 Log.d("VIA_System", "Starting full library refresh cycle.")
@@ -1139,11 +1196,15 @@ class MainActivity : AppCompatActivity() {
                         speak("נוספו $newFilesCount קבצים חדשים")
                     }
                 } else {
-                    // Notify the user that no new files have been updated
-                    while (isVoiceBusy) {
-                        kotlinx.coroutines.delay(1500)
+                    // Only tell them they are up to date if they specifically asked
+                    if (isManualRefresh) {
+                        while (isVoiceBusy) {
+                            kotlinx.coroutines.delay(500)
+                        }
+                        speak("אין קבצים חדשים")
+                    } else {
+                        Log.d("VIA_System", "Silent sync found no new files. Remaining quiet.")
                     }
-                    speak("אין קבצים חדשים")
                 }
 
                 // Saves the current size for the next check cleanly
@@ -1151,6 +1212,9 @@ class MainActivity : AppCompatActivity() {
 
             } catch (e: Exception) {
                 Log.e("VIA_Dropbox", "Library refresh completely failed: ${e.message}")
+            } finally {
+                // Guaranteed to run and "open the door" back up when everything finishes
+                isRefreshing = false
             }
         }
     }
@@ -1524,7 +1588,7 @@ class MainActivity : AppCompatActivity() {
         val apiService = retrofit.create(ApiService::class.java)
 
         // Call refreshLibrary (and notify user if new content exists, if need be)
-        refreshLibrary(apiService)
+        refreshLibrary(apiService, false) // false means manual sync
 
     }
 
