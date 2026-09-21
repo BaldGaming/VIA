@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
     private var ttsJob: kotlinx.coroutines.Job? = null
     private var progressJob: kotlinx.coroutines.Job? =
         null // Tracks playback progress to auto-mark files
-    private var isVoiceBusy: Boolean = false
+    var isVoiceBusy: Boolean = false
 
     // Tracks which track is currently physically loaded into the engine
     private var loadedAudioIndex: Int = -1
@@ -111,8 +111,13 @@ class MainActivity : AppCompatActivity() {
     private var isRefreshing = false
 
     // SoundPool player
-    private var soundPool: SoundPool? = null
+    var soundPool: SoundPool? = null
     private var jingleId: Int = 0
+    var beepId: Int = 0
+
+    // Public string for the admin messages
+    val backMessage = "הַזְּמַן נִגְמַר, חזרתא לַמָּסָךְ הָרָאשִׁי."
+    val stayMessage = "ברּוּך הבא לְמָסַךְ המנהל."
 
     // Initializes the main activity when the app launches
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -227,13 +232,14 @@ class MainActivity : AppCompatActivity() {
 
         // Build the SoundPool engine
         soundPool = SoundPool.Builder()
-            .setMaxStreams(1) // Only need 1 stream for a single jingle
+            .setMaxStreams(50) // Only need 1 stream for a single jingle
             .setAudioAttributes(audioAttributes)
             .build()
 
         // Loads the MP3 from res/raw into RAM and save its ID
         soundPool?.let { pool ->
-            jingleId = pool.load(this, R.raw.short_jingle, 1)
+            jingleId = pool.load(this, R.raw.short_jingle_0, 1)
+            beepId = pool.load(this, R.raw.beep_sfx, 1)
         }
 
         /**
@@ -343,8 +349,16 @@ class MainActivity : AppCompatActivity() {
             // The counter check
             if (devTapCount == 7) {
                 Log.d("VIA_System", "7 taps detected: Opening Admin screen.")
-                findViewById<View>(R.id.fragment_dev).visibility = View.VISIBLE
-                speak("מַצַּב מְנַהֵל הופְעָל$dot אִם זֹאת טָעוּת, תִּיצֹּר קֶשֶׁר עִם יַרְדֵּן.")
+
+                val fragmentContainer = findViewById<View>(R.id.fragment_dev)
+                fragmentContainer.visibility = View.VISIBLE
+
+                speak("מַצַּב מְנַהֵל הופְעָל$dot יֵשׁ לָכֶם חָמֵשׁ שְׁנִיּוֹת לְאַשֵּׁר כְּנִיסָה לְמָסָךְ זֶה, אַחֶרֶת הָאַפְּלִיקַצְיָה תַּחֲזֹר לַמָּסָךְ הָרָאשִׁי.")
+
+                // Find the fragment and start the countdown sequence
+                val devFragment = supportFragmentManager.findFragmentById(R.id.fragment_dev) as? FragmentDev
+                devFragment?.startAdminTimeoutSequence()
+
                 devTapCount = 0 // Reset the counter
             } else {
                 // Read the title, and play the jingle when it finishes
@@ -682,7 +696,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function that manages the local cache window
-    private fun updateSlidingWindow() {
+    fun updateSlidingWindow() {
         // Prevents crashing if the queue hasn't loaded yet
         if (audioQueue.isEmpty()) return
 
@@ -696,10 +710,12 @@ class MainActivity : AppCompatActivity() {
             val cleanTitle = getCleanTitle(audioQueue[i].title)
             val textNormal = "שם הקובץ הינו $cleanTitle"
             val textHeard = "שם הקובץ הינו $cleanTitle. כבר האזנת לקובץ זה."
+            val textAutoPlay = "הקובץ הסתיים, עובר לקובץ הבא. שם הקובץ הינו $cleanTitle"
 
             // Silently downloads the audio file if it doesn't already exist
             prefetchTTS(textNormal)
             prefetchTTS(textHeard)
+            prefetchTTS(textAutoPlay)
         }
 
         // Dynamically extract active channels
@@ -734,7 +750,9 @@ class MainActivity : AppCompatActivity() {
             "רשימת הקבצים עדיין בטעינה, אנא המתן",
             "כל הקבצים סומנו כהושלמו",
             "האפליקציה בודקת אם יש עדכון ברשימת הקבצים",
-            "נוסף קובץ אחד חדש"
+            "נוסף קובץ אחד חדש",
+            "מַצַּב מְנַהֵל הופְעָל$dot יֵשׁ לָכֶם חָמֵשׁ שְׁנִיּוֹת לְאַשֵּׁר כְּנִיסָה לְמָסָךְ זֶה אַחֶרֶת הָאַפְּלִיקַצְיָה תַּחֲזֹר לַמָּסָךְ הָרָאשִׁי.",
+            "אתה משתמש באפליקציה בשם וי אה$dot כפתור ירוק: לחיצה תתחיל ותפסיק את השמע$comma ולחיצה ארוכה תסמן כנשמע$dot כפתור אדום: תקריא את הכותרת$comma ולחיצה ארוכה תשמיע את כל הכפתורים$dot כפתור כחול: מעביר לערוץ הבא$dot כפתור צהוב: מעביר לערוץ הקודם$comma ולחיצה ארוכה תעביר לתחילת הקובץ$dot לחיצה על כחול וצהוב יחד ירענן את הרשימה$dot כפתור ורוד: מעביר לקובץ הבא$comma ולחיצה ארוכה יעביר לקובץ הבא שלא הושמע עדיין$dot כפתור לבן: מעביר לקובץ קודם$comma ולחיצה ארוכה תעביר לתחילת הרשימה$dot לחיצה על ורוד ולבן יחד תסגור את האפליקציה$dot עבור הסברים נוספים$comma תפנה לירדן$dot"
         )
         staticStrings.forEach { prefetchTTS(it) }
 
@@ -745,7 +763,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // TTS function
-    private fun speak(text: String, onComplete: (() -> Unit)? = null) {
+    fun speak(text: String, onComplete: (() -> Unit)? = null) {
         // Sets the isVoiceBusy flag
         isVoiceBusy = true
 
@@ -1359,6 +1377,7 @@ class MainActivity : AppCompatActivity() {
                 "כפתור לבן: מעביר לקובץ קודם$comma ולחיצה ארוכה תעביר לתחילת הרשימה",
                 "לחיצה על ורוד ולבן יחד תסגור את האפליקציה"
             )
+            allInstructions.forEach { prefetchTTS(it) }
 
             // Pick 1 random tip from the list and play it
             val randomInstruction = allInstructions.random()
