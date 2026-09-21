@@ -36,6 +36,7 @@ import androidx.media3.common.Player                      // The interface that 
 import androidx.media3.session.MediaController            // The "remote control" that talks to your background PlaybackService.
 import androidx.media3.session.SessionToken               // The secure key used to connect the MediaController to the Service.
 import android.content.ComponentName                      // Specifies the exact PlaybackService class to connect to.
+import android.content.pm.ActivityInfo
 import com.google.common.util.concurrent.ListenableFuture // A concurrency tool that waits for the MediaController to connect.
 
 // --- ASYNC & COROUTINES (BACKGROUND WORKERS) ---
@@ -118,6 +119,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+
+        // Disables screen rotation
+        this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
 
         // Initializes the admin fragment
         if (savedInstanceState == null) {
