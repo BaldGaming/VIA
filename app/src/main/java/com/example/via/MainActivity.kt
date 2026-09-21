@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity() {
     private var devTapCount = 0
     private var lastTapTime: Long = 0
 
-    // Prevents double-syncing if multi-touch triggers twice
+    // Prevents double-syncing if multitouch triggers twice
     private var isRefreshing = false
 
     // SoundPool player
@@ -988,38 +988,35 @@ class MainActivity : AppCompatActivity() {
     // Function that handles pausing audio.
     private fun pauseAudio() {
         mediaController?.let { player ->
+            val audioPath = audioQueue[currentAudioIndex].path // Gets the audio path
+            val rawPosition = player.currentPosition // Gets the current position
+
+            // Subtracts 3 seconds so the user has a slight overlap when resuming
+            val adjustedPosition = if (rawPosition > 3000) {
+                (rawPosition - 3000).toInt()
+            } else {
+                0
+            }
+
+            // Saves position and current index to SharedPreferences cleanly
+            prefs.edit {
+                putInt("last_pos_$audioPath", adjustedPosition)
+                putInt("last_active_index", currentAudioIndex)
+            }
+
+            // Pauses the player
             if (player.isPlaying) {
-                // Gets the audio path
-                val audioPath = audioQueue[currentAudioIndex].path
-
-                // Gets the current position
-                val rawPosition = player.currentPosition
-
-                // Subtracts 3 seconds so the user has a slight overlap when resuming
-                val adjustedPosition = if (rawPosition > 3000) {
-                    (rawPosition - 3000).toInt()
-                } else {
-                    0
-                }
-
-                // Saves position and current index to SharedPreferences cleanly
-                prefs.edit {
-                    putInt("last_pos_$audioPath", adjustedPosition)
-                    putInt("last_active_index", currentAudioIndex)
-                }
-
-                // Pauses the player
                 player.pause()
                 keepScreenAwake(false) // Lets screen sleep when paused
-
-                // Safely releases the CPU WakeLock so it doesn't drain the battery
-                if (wakeLock?.isHeld == true) wakeLock?.release()
-
-                Log.d(
-                    "VIA_Audio",
-                    "Track PAUSED at $rawPosition ms, saved overlapping position as $adjustedPosition ms"
-                )
             }
+
+            // Safely releases the CPU WakeLock so it doesn't drain the battery
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+
+            Log.d(
+                "VIA_Audio",
+                "Track PAUSED at $rawPosition ms, saved overlapping position as $adjustedPosition ms"
+            )
         }
     }
 
