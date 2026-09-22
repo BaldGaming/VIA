@@ -23,9 +23,9 @@ import java.util.Locale
 class FragmentDev : Fragment() {
 
     // Declare the button in such a way it is visible for the whole class
-    private lateinit var verifyBtn: ImageButton // "lateinit" declares a non-nullable property without initializing it immediately when the project is created
+    private lateinit var stayBtn: ImageButton // "lateinit" declares a non-nullable property without initializing it immediately when the project is created
 
-    // Used for flagging if the user hit the verify button in time
+    // Used for flagging if the user hit the stay button in time
     var stay: Boolean = false
 
     // The master switch to instantly kill the background timer
@@ -61,14 +61,11 @@ class FragmentDev : Fragment() {
         buttonGrid = view.findViewById(R.id.button_grid)
 
         // Defines the buttons
-        verifyBtn = view.findViewById(R.id.button6)
+        stayBtn = view.findViewById(R.id.button6)
         val logButton = view.findViewById<Button>(R.id.logButton)
 
         // Hides the UI elements immediately so the screen is pure black
-        toolbar.visibility = View.INVISIBLE
-        paginationLayout.visibility = View.INVISIBLE
-        buttonGrid.visibility = View.INVISIBLE
-        verifyBtn.visibility = View.INVISIBLE
+        randomizeStayCords()
 
         /**
          * Close logic
@@ -78,9 +75,9 @@ class FragmentDev : Fragment() {
             activity?.findViewById<View>(R.id.fragment_dev)?.visibility = View.GONE
         }
 
-        verifyBtn.setOnClickListener { // tap
+        stayBtn.setOnClickListener { // tap
             stay = true
-            verifyBtn.visibility = View.INVISIBLE
+            stayBtn.visibility = View.INVISIBLE
         }
 
         logButton.setOnClickListener {
@@ -95,10 +92,7 @@ class FragmentDev : Fragment() {
         stay = false
 
         // Resets the screen to pure black on a revisit
-        toolbar.visibility = View.INVISIBLE
-        paginationLayout.visibility = View.INVISIBLE
-        buttonGrid.visibility = View.INVISIBLE
-        verifyBtn.visibility = View.INVISIBLE
+        randomizeStayCords()
 
         // Cancel any old running jobs just to be safe
         countdownJob?.cancel()
@@ -107,17 +101,17 @@ class FragmentDev : Fragment() {
         countdownJob = viewLifecycleOwner.lifecycleScope.launch {
             // Wait for the admin entry warning TTS to finish talking
             while (mainActivity.isVoiceBusy) {
+                if (stay) {
+                    break
+                }
                 delay(200)
             }
 
             if (!isAdded) return@launch
 
-            // Enable ONLY the verify button now that talking is done
-            verifyBtn.visibility = View.VISIBLE
-
             // Start the 5-second countdown beeps
             for (i in 0..4) {
-                // We detect if the user hit the verify button in time
+                // We detect if the user hit the stay button in time
                 if (stay) {
                     break
                 } else {
@@ -131,19 +125,17 @@ class FragmentDev : Fragment() {
 
             // The user confirmed he wants to stay
             if (stay) {
-                verifyBtn.visibility = View.INVISIBLE
+                stayBtn.visibility = View.INVISIBLE
 
                 // Reveals the entire dev screen
                 toolbar.visibility = View.VISIBLE
                 paginationLayout.visibility = View.VISIBLE
                 buttonGrid.visibility = View.VISIBLE
-
-                mainActivity.updateSlidingWindow()
+                
                 mainActivity.speak(mainActivity.stayMessage)
             } else {
                 // Time's up => kick user back to main screen
-                verifyBtn.visibility = View.INVISIBLE
-                mainActivity.updateSlidingWindow()
+                stayBtn.visibility = View.INVISIBLE
                 mainActivity.speak(mainActivity.backMessage)
                 activity?.findViewById<View>(R.id.fragment_dev)?.visibility = View.GONE
             }
@@ -161,6 +153,44 @@ class FragmentDev : Fragment() {
         // Auto-scroll to the bottom of the ScrollView
         logScrollView.post {
             logScrollView.fullScroll(ScrollView.FOCUS_DOWN)
+        }
+    }
+
+    // Function that enables the stayBtn and randomizes it's location
+    private fun randomizeStayCords() {
+
+        // Hides the standard UI elements
+        toolbar.visibility = View.INVISIBLE
+        paginationLayout.visibility = View.INVISIBLE
+        buttonGrid.visibility = View.INVISIBLE
+
+        // Sets a random location for the button
+        stayBtn.post {
+
+            // We grab the actual usable drawing space of the Fragment, avoiding system bars
+            val parentView = view ?: return@post
+
+            // Define a safety margin (in pixels) to keep it far from the absolute edges
+            val margin = 120
+
+            // We calculate max bounds using the parent view, subtracting the button size and our margin
+            val maxX = parentView.width - stayBtn.width - margin
+            val maxY = parentView.height - stayBtn.height - margin
+
+            // Prevent a crash if the calculated bounds are weirdly small
+            val safeMaxX = if (maxX > margin) maxX else margin
+            val safeMaxY = if (maxY > margin) maxY else margin
+
+            // Randomize the coordinates within the safe bounds
+            val randomX = (margin..safeMaxX).random()
+            val randomY = (margin..safeMaxY).random()
+
+            // Assign the new coordinates
+            stayBtn.x = randomX.toFloat()
+            stayBtn.y = randomY.toFloat()
+
+            // Reveal the button
+            stayBtn.visibility = View.VISIBLE
         }
     }
 }
