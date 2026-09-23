@@ -132,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
                 .setReorderingAllowed(true)
-                .add(R.id.fragment_dev, FragmentDev()) // The bucket ID, and the Fragment to put inside
+                .add(R.id.fragment_dev, DevFragment())
                 .commit()
         }
 
@@ -350,13 +350,12 @@ class MainActivity : AppCompatActivity() {
             if (devTapCount == 7) {
                 Log.d("VIA_System", "7 taps detected: Opening Admin screen.")
 
-                val fragmentContainer = findViewById<View>(R.id.fragment_dev)
-                fragmentContainer.visibility = View.VISIBLE
+                findViewById<View>(R.id.fragment_dev).visibility = View.VISIBLE // Reveal the admin screen
 
                 speak("מַצַּב מְנַהֵל הופְעָל$dot יֵשׁ לָכֶם חָמֵשׁ שְׁנִיּוֹת לְאַשֵּׁר כְּנִיסָה לְמָסָךְ זֶה, אַחֶרֶת הָאַפְּלִיקַצְיָה תַּחֲזֹר לַמָּסָךְ הָרָאשִׁי.")
 
                 // Find the fragment and start the countdown sequence
-                val devFragment = supportFragmentManager.findFragmentById(R.id.fragment_dev) as? FragmentDev
+                val devFragment = supportFragmentManager.findFragmentById(R.id.fragment_dev) as? DevFragment
                 devFragment?.startAdminTimeoutSequence()
 
                 devTapCount = 0 // Reset the counter

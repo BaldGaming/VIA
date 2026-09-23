@@ -1,7 +1,6 @@
 package com.example.via
 
 import android.os.Bundle
-import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
@@ -20,7 +19,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class FragmentDev : Fragment() {
+class DevFragment : Fragment() {
 
     // Declare the button in such a way it is visible for the whole class
     private lateinit var stayBtn: ImageButton // "lateinit" declares a non-nullable property without initializing it immediately when the project is created
@@ -57,12 +56,20 @@ class FragmentDev : Fragment() {
 
         // We find the toolbar and the UI containers
         toolbar = view.findViewById(R.id.admin_toolbar)
-        paginationLayout = view.findViewById(R.id.pagination_layout)
+        paginationLayout = view.findViewById(R.id.page_layout)
         buttonGrid = view.findViewById(R.id.button_grid)
 
         // Defines the buttons
         stayBtn = view.findViewById(R.id.button6)
-        val logButton = view.findViewById<Button>(R.id.logButton)
+        val logBtn = view.findViewById<Button>(R.id.btn_1)
+        val audioBtn = view.findViewById<Button>(R.id.btn_2)
+        val fileManagementBtn = view.findViewById<Button>(R.id.btn_3)
+        val fileMarkingBtn = view.findViewById<Button>(R.id.btn_4)
+        val offlineBtn = view.findViewById<Button>(R.id.btn_5)
+        val statisticsBtn = view.findViewById<Button>(R.id.btn_6)
+
+        // Instead of having 7 different screens, we create an empty bucket to put our fragment in
+        val subFragmentContainer = view.findViewById<View>(R.id.dev_sub_fragment_container)
 
         // Hides the UI elements immediately so the screen is pure black
         randomizeStayCords()
@@ -75,13 +82,82 @@ class FragmentDev : Fragment() {
             activity?.findViewById<View>(R.id.fragment_dev)?.visibility = View.GONE
         }
 
+        /**
+         * Stay logic
+         */
         stayBtn.setOnClickListener { // tap
             stay = true
             stayBtn.visibility = View.INVISIBLE
         }
 
-        logButton.setOnClickListener {
-            appendLog("pressed \"log\"")
+        /**
+         * Log button
+         */
+        logBtn.setOnClickListener {
+            // Put the LogsFragment inside the bucket
+            childFragmentManager.beginTransaction()
+                .replace(R.id.dev_sub_fragment_container, LogsFragment())
+                .commit()
+
+            // Make the bucket visible
+            subFragmentContainer.visibility = View.VISIBLE
+
+            // TODO: MOVE THIS! -> appendLog("pressed \"log\"")
+        }
+
+        /**
+         * Audio button
+         */
+        audioBtn.setOnClickListener {
+            childFragmentManager.beginTransaction()
+                .replace(R.id.dev_sub_fragment_container, AudioFragment())
+                .commit()
+
+            subFragmentContainer.visibility = View.VISIBLE
+        }
+
+        /**
+         * File Management button
+         */
+        fileManagementBtn.setOnClickListener {
+            childFragmentManager.beginTransaction()
+                .replace(R.id.dev_sub_fragment_container, FileMarkingFragment())
+                .commit()
+
+            subFragmentContainer.visibility = View.VISIBLE
+        }
+
+        /**
+         * File Marking button
+         */
+        fileMarkingBtn.setOnClickListener {
+            childFragmentManager.beginTransaction()
+                .replace(R.id.dev_sub_fragment_container, FileManagementFragment())
+                .commit()
+
+            subFragmentContainer.visibility = View.VISIBLE
+        }
+
+        /**
+         * Offline button
+         */
+        offlineBtn.setOnClickListener {
+            childFragmentManager.beginTransaction()
+                .replace(R.id.dev_sub_fragment_container, OfflineFragment())
+                .commit()
+
+            subFragmentContainer.visibility = View.VISIBLE
+        }
+
+        /**
+         * Statistics button
+         */
+        statisticsBtn.setOnClickListener {
+            childFragmentManager.beginTransaction()
+                .replace(R.id.dev_sub_fragment_container, StatisticsFragment())
+                .commit()
+
+            subFragmentContainer.visibility = View.VISIBLE
         }
     }
 

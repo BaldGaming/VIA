@@ -5,18 +5,19 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:clickable="true"
     android:focusable="true"
+    android:id="@+id/admin_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#222222"
+    android:background="@color/adminBg"
     tools:ignore="HardcodedText, VisualLintButtonSize"
-    tools:context=".FragmentDev">
+    tools:context=".DevFragment">
 
     <!-- The Top Banner (Toolbar) -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/admin_toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="#78da0b"
+        android:background="@color/greenTheme"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
@@ -24,24 +25,26 @@
         app:title="Admin Screen"
         app:titleTextColor="@color/black" />
 
-    <!-- The Stay Checkmark -->
+    <!-- The Stay Button -->
     <ImageButton
         android:id="@+id/button6"
         android:layout_width="38dp"
         android:layout_height="38dp"
         android:background="@drawable/bg_circle"
+        android:contentDescription="This button lets the user enter the admin screen"
         android:padding="8dp"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_check"
         app:layout_constraintBottom_toBottomOf="@+id/admin_toolbar"
         app:layout_constraintEnd_toEndOf="@+id/admin_toolbar"
-        app:layout_constraintHorizontal_bias="0.94"
+        app:layout_constraintHorizontal_bias="0.7"
         app:layout_constraintStart_toStartOf="@+id/admin_toolbar"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.5"
-        app:tint="#78da0b" />
+        app:tint="@color/greenTheme" />
 
-    <!-- HIDDEN LOG UI (Required for Kotlin to compile) -->
+    <!--TODO: Put this in a new fragment-->
+    <!-- Log UI -->
     <ScrollView
         android:id="@+id/logScrollView"
         android:layout_width="0dp"
@@ -59,11 +62,13 @@
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
             android:padding="16dp"
-            android:text="Event Log Started...\n"
-            android:textColor="#AAAAAA"
+            android:text="REPLACE ME?\n"
+            android:textColor="@color/text"
             android:textSize="14sp" />
     </ScrollView>
 
+    <!--TODO-->
+    <!-- This as well -->
     <Button
         android:id="@+id/logButton"
         android:layout_width="wrap_content"
@@ -75,9 +80,9 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Pagination Controls (Bottom Area) -->
+    <!-- Page Controls -->
     <LinearLayout
-        android:id="@+id/pagination_layout"
+        android:id="@+id/page_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -95,7 +100,7 @@
             android:background="@drawable/bg_circle"
             android:src="@drawable/ic_arrow_back"
             android:contentDescription="Previous Page"
-            app:tint="#78da0b"
+            app:tint="@color/greenTheme"
             android:padding="12dp"
             android:scaleType="fitCenter" />
 
@@ -106,11 +111,11 @@
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="42dp"
             android:text="1"
-            android:textColor="#78da0b"
-            android:textSize="28sp"
+            android:textColor="@color/greenTheme"
+            android:textSize="25sp"
             android:textStyle="bold" />
 
-        <!-- Right Arrow (Next Page - Flipped programmatically!) -->
+        <!-- Right Arrow (Next Page) -->
         <ImageButton
             android:id="@+id/btn_next_page"
             android:layout_width="56dp"
@@ -119,13 +124,13 @@
             android:src="@drawable/ic_arrow_back"
             android:contentDescription="Next Page"
             android:rotation="180"
-            app:tint="#78da0b"
+            app:tint="@color/greenTheme"
             android:padding="12dp"
             android:scaleType="fitCenter" />
 
     </LinearLayout>
 
-    <!-- 6 Big Buttons (Center Grid) -->
+    <!-- 6 Buttons -->
     <GridLayout
         android:id="@+id/button_grid"
         android:layout_width="0dp"
@@ -134,112 +139,246 @@
         android:rowCount="3"
         android:padding="12dp"
         app:layout_constraintTop_toBottomOf="@id/admin_toolbar"
-        app:layout_constraintBottom_toTopOf="@id/pagination_layout"
+        app:layout_constraintBottom_toTopOf="@id/page_layout"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <Button
-            android:id="@+id/grid_btn_1"
+        <!-- Cell 1 -->
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_rowWeight="1"
             android:layout_columnWeight="1"
-            android:layout_margin="10dp"
-            android:backgroundTint="#2C2C2C"
-            android:elevation="6dp"
-            app:cornerRadius="16dp"
-            app:rippleColor="#5578da0b"
-            android:text="Action 1"
-            android:textAllCaps="false"
-            android:textColor="#78da0b"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:layout_margin="10dp">
 
-        <Button
-            android:id="@+id/grid_btn_2"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_rowWeight="1"
-            android:layout_columnWeight="1"
-            android:layout_margin="10dp"
-            android:backgroundTint="#2C2C2C"
-            android:elevation="6dp"
-            app:cornerRadius="16dp"
-            app:rippleColor="#5578da0b"
-            android:text="Action 2"
-            android:textAllCaps="false"
-            android:textColor="#78da0b"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            <Button
+                android:id="@+id/btn_1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:backgroundTint="@color/adminBtn"
+                android:elevation="6dp"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple"
+                android:text="Logs"
+                android:textAllCaps="false"
+                android:textColor="@color/greenTheme"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/grid_btn_3"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_rowWeight="1"
-            android:layout_columnWeight="1"
-            android:layout_margin="10dp"
-            android:backgroundTint="#2C2C2C"
-            android:elevation="6dp"
-            app:cornerRadius="16dp"
-            app:rippleColor="#5578da0b"
-            android:text="Action 3"
-            android:textAllCaps="false"
-            android:textColor="#78da0b"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            <ImageButton
+                android:id="@+id/infoBtn_1"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle"
+                android:src="@drawable/ic_info"
+                android:contentDescription="Info for Logs"
+                app:tint="@color/greenTheme"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:elevation="7dp" />
+        </FrameLayout>
 
-        <Button
-            android:id="@+id/grid_btn_4"
+        <!-- Cell 2 -->
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_rowWeight="1"
             android:layout_columnWeight="1"
-            android:layout_margin="10dp"
-            android:backgroundTint="#2C2C2C"
-            android:elevation="6dp"
-            app:cornerRadius="16dp"
-            app:rippleColor="#5578da0b"
-            android:text="Action 4"
-            android:textAllCaps="false"
-            android:textColor="#78da0b"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:layout_margin="10dp">
 
-        <Button
-            android:id="@+id/grid_btn_5"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_rowWeight="1"
-            android:layout_columnWeight="1"
-            android:layout_margin="10dp"
-            android:backgroundTint="#2C2C2C"
-            android:elevation="6dp"
-            app:cornerRadius="16dp"
-            app:rippleColor="#5578da0b"
-            android:text="Action 5"
-            android:textAllCaps="false"
-            android:textColor="#78da0b"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            <Button
+                android:id="@+id/btn_2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:backgroundTint="@color/adminBtn"
+                android:elevation="6dp"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple"
+                android:text="Audio Settings"
+                android:textAllCaps="false"
+                android:textColor="@color/greenTheme"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/grid_btn_6"
+            <ImageButton
+                android:id="@+id/infoBtn_2"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle"
+                android:src="@drawable/ic_info"
+                android:contentDescription="Info for Audio Settings"
+                app:tint="@color/greenTheme"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:elevation="7dp" />
+        </FrameLayout>
+
+        <!-- Cell 3 -->
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_rowWeight="1"
             android:layout_columnWeight="1"
-            android:layout_margin="10dp"
-            android:backgroundTint="#2C2C2C"
-            android:elevation="6dp"
-            app:cornerRadius="16dp"
-            app:rippleColor="#5578da0b"
-            android:text="Action 6"
-            android:textAllCaps="false"
-            android:textColor="#78da0b"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:layout_margin="10dp">
+
+            <Button
+                android:id="@+id/btn_3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:backgroundTint="@color/adminBtn"
+                android:elevation="6dp"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple"
+                android:text="File Marking"
+                android:textAllCaps="false"
+                android:textColor="@color/greenTheme"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/infoBtn_3"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle"
+                android:src="@drawable/ic_info"
+                android:contentDescription="Info for File Marking"
+                app:tint="@color/greenTheme"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:elevation="7dp" />
+        </FrameLayout>
+
+        <!-- Cell 4 -->
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1"
+            android:layout_margin="10dp">
+
+            <Button
+                android:id="@+id/btn_4"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:backgroundTint="@color/adminBtn"
+                android:elevation="6dp"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple"
+                android:text="File Management"
+                android:textAllCaps="false"
+                android:textColor="@color/greenTheme"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/infoBtn_4"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle"
+                android:src="@drawable/ic_info"
+                android:contentDescription="Info for File Management"
+                app:tint="@color/greenTheme"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:elevation="7dp" />
+        </FrameLayout>
+
+        <!-- Cell 5 -->
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1"
+            android:layout_margin="10dp">
+
+            <Button
+                android:id="@+id/btn_5"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:backgroundTint="@color/adminBtn"
+                android:elevation="6dp"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple"
+                android:text="Offline Mode"
+                android:textAllCaps="false"
+                android:textColor="@color/greenTheme"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/infoBtn_5"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle"
+                android:src="@drawable/ic_info"
+                android:contentDescription="Info for Offline Mode"
+                app:tint="@color/greenTheme"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:elevation="7dp" />
+        </FrameLayout>
+
+        <!-- Cell 6 -->
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_rowWeight="1"
+            android:layout_columnWeight="1"
+            android:layout_margin="10dp">
+
+            <Button
+                android:id="@+id/btn_6"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:backgroundTint="@color/adminBtn"
+                android:elevation="6dp"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple"
+                android:text="Statistics"
+                android:textAllCaps="false"
+                android:textColor="@color/greenTheme"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/infoBtn_6"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle"
+                android:src="@drawable/ic_info"
+                android:contentDescription="Info for Statistics"
+                app:tint="@color/greenTheme"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:elevation="7dp" />
+        </FrameLayout>
 
     </GridLayout>
+
+    <!-- A single bucket for all 6 sub-screens -->
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/dev_sub_fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:elevation="20dp"
+        android:visibility="gone" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

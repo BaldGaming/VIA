@@ -47,7 +47,7 @@ val computedVersionName = "$majorVersion.$minorCount.$patchCount"
 
 // Safely generates a unique whole number for Google Play (Multiplied by 100,000 so the Minor version can go up to 999 safely)
 val computedVersionCode = (majorVersion * 100000) + (minorCount * 100) + patchCount
-// Ends here!
+// ---------------------------
 
 plugins {
     alias(libs.plugins.android.application)
