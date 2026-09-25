@@ -64,6 +64,10 @@ android {
     namespace = "com.example.via"
     compileSdk = 36
 
+    viewBinding { // Something to do with back press implementation
+        enable = true
+    }
+
     defaultConfig {
         applicationId = "com.example.via"
         minSdk = 26

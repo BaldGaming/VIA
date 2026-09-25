@@ -1,10 +1,10 @@
 package com.example.via
 
 // --- CORE ANDROID & UI ---
-import android.content.Context                  // Accesses system-level services (Preferences, Vibrator, Power).
 import android.os.Bundle                        // Passes the saved state when the app screen is created.
 import android.util.Log                         // Prints debugging messages to the Logcat console.
 import android.view.View                        // Represents standard UI elements (used for Fragment visibility).
+import android.view.WindowManager               // Controls window states (like keeping the screen awake).
 import android.widget.Button                    // Hooks up the UI buttons (Play, Rewind, etc.).
 import android.widget.Toast                     // Shows the small pop-up message for the double-tap exit.
 import androidx.activity.OnBackPressedCallback  // Handles modern system back-button gestures safely.
@@ -24,9 +24,11 @@ import androidx.core.content.edit          // Simplifies saving data to SharedPr
 import androidx.core.content.ContextCompat // Safely grabs system executors or resources.
 
 // --- AUDIO & MEDIA PLAYBACK ---
-import android.media.MediaPlayer       // Streams and plays the downloaded local TTS voice files.
-import android.media.SoundPool         // Caches and plays short, zero-latency UI sound effects (Jingles).
-import android.speech.tts.TextToSpeech // The native offline fallback voice engine.
+import android.media.AudioAttributes           // Defines what kind of audio is being played (Music/Media).
+import android.media.MediaPlayer               // Streams and plays the downloaded local TTS voice files.
+import android.media.SoundPool                 // Caches and plays short, zero-latency UI sound effects (Jingles).
+import android.speech.tts.TextToSpeech         // The native offline fallback voice engine.
+import android.speech.tts.UtteranceProgressListener // Listens for when the offline TTS starts and stops.
 
 // --- MEDIA3 (EXOPLAYER) BACKGROUND STREAMING ---
 import androidx.media3.common.MediaItem                   // Represents the audio file URL for ExoPlayer to stream.
@@ -116,7 +118,7 @@ class MainActivity : AppCompatActivity() {
     var beepId: Int = 0
 
     // Public string for the admin messages
-    val backMessage = "הַזְּמַן נִגְמַר, חזרתא לַמָּסָךְ הָרָאשִׁי."
+    val backMessage = "הַזְּמַן נִגְמַר, חזרתא לַמָּסָךְ הָרָאשִׁי."
     val stayMessage = "ברּוּך הבא לְמָסַךְ המנהל."
 
     // Initializes the main activity when the app launches
@@ -126,24 +128,26 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // Disables screen rotation
-        this.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
         // Initializes the admin fragment
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
                 .setReorderingAllowed(true)
                 .add(R.id.fragment_dev, DevFragment())
+                .setReorderingAllowed(true)
+                .addToBackStack(null)
                 .commit()
         }
 
         // Initializes the offline fallback TTS engine
         fallbackTts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                fallbackTts?.setLanguage(Locale.forLanguageTag("he"))
+                fallbackTts?.language = Locale.forLanguageTag("he")
 
                 // Listens to exactly when the fallback voice starts and stops
                 fallbackTts?.setOnUtteranceProgressListener(object :
-                    android.speech.tts.UtteranceProgressListener() {
+                    UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         keepScreenAwake(true)
                     }
@@ -192,7 +196,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Opens the app's private save file ("via_prefs") to remember things like audio timestamps
-        prefs = getSharedPreferences("via_prefs", Context.MODE_PRIVATE)
+        prefs = getSharedPreferences("via_prefs", MODE_PRIVATE)
 
         // Loads the last saved audio file index if exists. Else, defaults to the first file.
         currentAudioIndex = prefs.getInt("last_active_index", 0)
@@ -211,7 +215,7 @@ class MainActivity : AppCompatActivity() {
             findViewById<Button>(R.id.button4) // Previous file / Start of list / Exit app (with Pink).
 
         // Wakelock object
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         // A unique tag for identification
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VIA::WakeLockTag")
 
@@ -225,9 +229,9 @@ class MainActivity : AppCompatActivity() {
         apiService = retrofit.create(ApiService::class.java)
 
         // Tell Android what kind of audio this is
-        val audioAttributes = android.media.AudioAttributes.Builder()
-            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
 
         // Build the SoundPool engine
@@ -352,7 +356,7 @@ class MainActivity : AppCompatActivity() {
 
                 findViewById<View>(R.id.fragment_dev).visibility = View.VISIBLE // Reveal the admin screen
 
-                speak("מַצַּב מְנַהֵל הופְעָל$dot יֵשׁ לָכֶם חָמֵשׁ שְׁנִיּוֹת לְאַשֵּׁר כְּנִיסָה לְמָסָךְ זֶה, אַחֶרֶת הָאַפְּלִיקַצְיָה תַּחֲזֹר לַמָּסָךְ הָרָאשִׁי.")
+                speak("מַצַּב מְנַהֵל הופְעָל$dot יֵשׁ לָכֶם חָמֵשׁ שְׁנִיּוֹת לְאַשֵּׁר כְּנִיסָה לְמָסָךְ זֶה, אַחֶרֶת הָאַפְּלִיקַצְיָה תַּחֲזֹר לַמָּסָךְ הָרָאשִׁי.")
 
                 // Find the fragment and start the countdown sequence
                 val devFragment = supportFragmentManager.findFragmentById(R.id.fragment_dev) as? DevFragment
@@ -750,7 +754,7 @@ class MainActivity : AppCompatActivity() {
             "כל הקבצים סומנו כהושלמו",
             "האפליקציה בודקת אם יש עדכון ברשימת הקבצים",
             "נוסף קובץ אחד חדש",
-            "מַצַּב מְנַהֵל הופְעָל$dot יֵשׁ לָכֶם חָמֵשׁ שְׁנִיּוֹת לְאַשֵּׁר כְּנִיסָה לְמָסָךְ זֶה אַחֶרֶת הָאַפְּלִיקַצְיָה תַּחֲזֹר לַמָּסָךְ הָרָאשִׁי.",
+            "מַצַּב מְנַהֵל הופְעָל$dot יֵשׁ לָכֶם חָמֵשׁ שְׁנִיּוֹת לְאַשֵּׁר כְּנִיסָה לְמָסָךְ זֶה אַחֶרֶת הָאַפְּלִיקַצְיָה תַּחֲזֹר לַמָּסָךְ הָרָאשִׁי.",
             "אתה משתמש באפליקציה בשם וי אה$dot כפתור ירוק: לחיצה תתחיל ותפסיק את השמע$comma ולחיצה ארוכה תסמן כנשמע$dot כפתור אדום: תקריא את הכותרת$comma ולחיצה ארוכה תשמיע את כל הכפתורים$dot כפתור כחול: מעביר לערוץ הבא$dot כפתור צהוב: מעביר לערוץ הקודם$comma ולחיצה ארוכה תעביר לתחילת הקובץ$dot לחיצה על כחול וצהוב יחד ירענן את הרשימה$dot כפתור ורוד: מעביר לקובץ הבא$comma ולחיצה ארוכה יעביר לקובץ הבא שלא הושמע עדיין$dot כפתור לבן: מעביר לקובץ קודם$comma ולחיצה ארוכה תעביר לתחילת הרשימה$dot לחיצה על ורוד ולבן יחד תסגור את האפליקציה$dot עבור הסברים נוספים$comma תפנה לירדן$dot"
         )
         staticStrings.forEach { prefetchTTS(it) }
@@ -967,11 +971,11 @@ class MainActivity : AppCompatActivity() {
         // Gets the correct vibrator service depending on the Android version
         val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vibratorManager =
-                getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
             vibratorManager.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
-            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            getSystemService(VIBRATOR_SERVICE) as Vibrator
         }
 
         // Creates an effect: (Duration in ms, Amplitude 1-255)
@@ -1241,10 +1245,10 @@ class MainActivity : AppCompatActivity() {
     private fun keepScreenAwake(keepAwake: Boolean) {
         runOnUiThread {
             if (keepAwake) {
-                window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 Log.d("VIA_Screen", "Screen WakeLock forced AWAKE")
             } else {
-                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 Log.d("VIA_Screen", "Screen WakeLock allowed to SLEEP")
             }
         }

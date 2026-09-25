@@ -8,18 +8,15 @@ import android.view.ViewGroup
 
 class LogsFragment : Fragment() {
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         // Only inflate the layout here, nothing else!
         return inflater.inflate(R.layout.fragment_logs, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+    }
 
         // TODO: CODE HERE vvv
 
     }
-}
