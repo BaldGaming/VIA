@@ -139,4 +139,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // Shit for messages
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
 }

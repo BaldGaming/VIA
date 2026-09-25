@@ -1,65 +1,65 @@
 package com.example.via
 
 // --- CORE ANDROID & UI ---
-import android.os.Bundle                        // Passes the saved state when the app screen is created.
-import android.util.Log                         // Prints debugging messages to the Logcat console.
-import android.view.View                        // Represents standard UI elements (used for Fragment visibility).
-import android.view.WindowManager               // Controls window states (like keeping the screen awake).
-import android.widget.Button                    // Hooks up the UI buttons (Play, Rewind, etc.).
-import android.widget.Toast                     // Shows the small pop-up message for the double-tap exit.
-import androidx.activity.OnBackPressedCallback  // Handles modern system back-button gestures safely.
-import androidx.activity.enableEdgeToEdge       // Lets the app draw behind the status and navigation bars.
-import androidx.appcompat.app.AppCompatActivity // Acts as the base class for the main screen (MainActivity).
-import androidx.core.view.ViewCompat            // Applies window insets so UI doesn't overlap system bars.
-import androidx.core.view.WindowInsetsCompat    // Measures the exact size of the system bars.
 
 // --- HARDWARE & SYSTEM SERVICES ---
-import android.os.Build                    // Checks the Android version to pick the right vibrator service.
-import android.os.PowerManager             // Controls the WakeLock to prevent the CPU from sleeping during playback.
-import android.os.VibrationEffect          // Defines the exact strength and length of the haptic vibration.
-import android.os.Vibrator                 // Triggers haptic feedback on older Android versions.
-import android.os.VibratorManager          // Triggers haptic feedback on newer Android versions (Android 12+).
-import android.content.SharedPreferences   // Saves simple data locally (timestamps, active index, heard status).
-import androidx.core.content.edit          // Simplifies saving data to SharedPreferences (KTX extension).
-import androidx.core.content.ContextCompat // Safely grabs system executors or resources.
 
 // --- AUDIO & MEDIA PLAYBACK ---
-import android.media.AudioAttributes           // Defines what kind of audio is being played (Music/Media).
-import android.media.MediaPlayer               // Streams and plays the downloaded local TTS voice files.
-import android.media.SoundPool                 // Caches and plays short, zero-latency UI sound effects (Jingles).
-import android.speech.tts.TextToSpeech         // The native offline fallback voice engine.
-import android.speech.tts.UtteranceProgressListener // Listens for when the offline TTS starts and stops.
 
 // --- MEDIA3 (EXOPLAYER) BACKGROUND STREAMING ---
-import androidx.media3.common.MediaItem                   // Represents the audio file URL for ExoPlayer to stream.
-import androidx.media3.common.PlaybackException           // Handles ExoPlayer network errors (timeouts, dropped connections).
-import androidx.media3.common.PlaybackParameters          // Controls ExoPlayer playback speed and pitch.
-import androidx.media3.common.Player                      // The interface that listens to playback state changes (Playing, Ended).
-import androidx.media3.session.MediaController            // The "remote control" that talks to your background PlaybackService.
-import androidx.media3.session.SessionToken               // The secure key used to connect the MediaController to the Service.
-import android.content.ComponentName                      // Specifies the exact PlaybackService class to connect to.
-import android.content.pm.ActivityInfo
-import com.google.common.util.concurrent.ListenableFuture // A concurrency tool that waits for the MediaController to connect.
 
 // --- ASYNC & COROUTINES (BACKGROUND WORKERS) ---
-import androidx.lifecycle.lifecycleScope // Runs background API tasks safely without crashing the UI.
-import kotlinx.coroutines.launch         // The specific command that starts the background coroutine.
 
 // --- NETWORKING (RETROFIT & DROPBOX/AZURE) ---
-import retrofit2.Retrofit                            // The main library used to send HTTP requests to APIs.
-import retrofit2.converter.gson.GsonConverterFactory // Translates JSON network responses directly into Kotlin objects.
-import okhttp3.MediaType.Companion.toMediaType       // Converts strings into HTTP media types.
-import okhttp3.RequestBody.Companion.toRequestBody   // Converts raw strings (like SSML) into HTTP request payloads.
-import org.json.JSONObject                           // Safely builds JSON objects (used for formatting Dropbox .h marker requests).
 
 // --- FILE SYSTEM (LOCAL TTS CACHE) ---
-import java.io.File             // Represents a file or folder path on the device.
-import java.io.FileOutputStream // Handles writing raw downloaded audio bytes into the local file.
 
 // --- UTILS (DATES & LANGUAGES) ---
-import java.text.SimpleDateFormat // Formats dates to track daily instruction limits and monthly Azure quotas.
-import java.util.Date             // Represents a specific moment in time.
-import java.util.Locale           // Sets the regional language explicitly (Hebrew) for the fallback engine.
+import android.content.ComponentName
+import android.content.SharedPreferences
+import android.content.pm.ActivityInfo
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.SoundPool
+import android.os.Build
+import android.os.Bundle
+import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
+import android.view.View
+import android.view.WindowManager
+import android.widget.Button
+import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // Song data class
 data class AudioFile(val title: String, val path: String)
@@ -120,6 +120,8 @@ class MainActivity : AppCompatActivity() {
     // Public string for the admin messages
     val backMessage = "הַזְּמַן נִגְמַר, חזרתא לַמָּסָךְ הָרָאשִׁי."
     val stayMessage = "ברּוּך הבא לְמָסַךְ המנהל."
+
+    // Define every type of log TODO: !!! UPDATE THIS IF I EVER ADD A NEW LOG TYPE !!!
 
     // Initializes the main activity when the app launches
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -341,7 +343,7 @@ class MainActivity : AppCompatActivity() {
             val currentTime = System.currentTimeMillis()
 
             // Check if the user tapped fast enough
-            if (currentTime - lastTapTime < 500) {
+            if (currentTime - lastTapTime < 750) {
                 devTapCount++
             } else {
                 devTapCount = 1

@@ -42,9 +42,11 @@
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
             android:padding="16dp"
-            android:text="Event Log Started...\n"
             android:textColor="@color/text"
-            android:textSize="14sp" />
+            android:textSize="14sp"
+            android:textDirection="ltr"
+            android:gravity="left|top"
+            android:fontFeatureSettings="tnum" />
     </ScrollView>
 
     <!-- The Test Log Button -->

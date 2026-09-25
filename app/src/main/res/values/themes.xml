@@ -6,4 +6,16 @@
     </style>
 
     <style name="Theme.VIA" parent="Base.Theme.VIA" />
+
+    <style name="CustomAlertDialogTheme" parent="Theme.AppCompat.Dialog.Alert">
+        <!-- Applies a dark background with the rounded corners -->
+        <item name="android:windowBackground">@drawable/dialog_rounded_bg</item>
+
+        <!-- Changes the title text color -->
+        <item name="android:textColorPrimary">@color/text</item>
+
+        <!-- Changes the message body text color -->
+        <item name="android:textColorSecondary">@color/text</item>
+    </style>
+
 </resources>

@@ -1,32 +1,25 @@
 package com.example.via
 
 // --- CORE ANDROID & UI ---
-import android.os.Bundle                        // Passes the saved state when the app screen is created.
-import android.view.LayoutInflater              // Converts the XML layout file into actual UI objects.
-import android.view.View                        // Represents standard UI elements (used for visibility toggles).
-import android.view.ViewGroup                   // A special view that can contain other views (like layouts).
-import android.widget.Button                    // Hooks up the standard UI buttons (Logs, Audio, etc.).
-import android.widget.ImageButton               // Hooks up buttons that use icons instead of text (Stay button).
-import android.widget.ScrollView                // Allows the text log to scroll vertically.
-import android.widget.TextView                  // Displays the text inside the log screen.
-import androidx.activity.OnBackPressedCallback  // Handles modern system back-button gestures securely.
-import androidx.fragment.app.Fragment           // The base class for making modular screens.
-import android.util.Log                         // Prints debugging messages to the Logcat console.
-
+import android.os.Bundle
+import android.text.SpannableString
+import android.text.style.UnderlineSpan
+import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.ImageButton
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 
 // --- ASYNC & COROUTINES (BACKGROUND WORKERS) ---
-import androidx.lifecycle.lifecycleScope        // Runs background timers safely without crashing the UI.
-import kotlinx.coroutines.Job                   // Represents a background task that can be canceled (the countdown).
-import kotlinx.coroutines.delay                 // Pauses a background task for a specific amount of time.
-import kotlinx.coroutines.launch                // The specific command that starts the background coroutine.
-
-// --- UTILS (DATES & TIMESTAMPS) ---
-import java.text.SimpleDateFormat               // Formats timestamps for the log output.
-import java.util.Date                           // Gets the exact current time for the log.
-import java.util.Locale                         // Sets the regional formatting for the time.
-
-
-
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class DevFragment : Fragment() {
 
@@ -106,12 +99,21 @@ class DevFragment : Fragment() {
         subFragmentContainer = view.findViewById(R.id.dev_sub_fragment_container)
         stayBtn = view.findViewById(R.id.button6)
 
+        // Menu buttons
         val logBtn = view.findViewById<Button>(R.id.btn_1)
         val audioBtn = view.findViewById<Button>(R.id.btn_2)
         val fileManagementBtn = view.findViewById<Button>(R.id.btn_3)
         val fileMarkingBtn = view.findViewById<Button>(R.id.btn_4)
         val offlineBtn = view.findViewById<Button>(R.id.btn_5)
         val statisticsBtn = view.findViewById<Button>(R.id.btn_6)
+
+        // Info buttons
+        val infoBtn1 = view.findViewById<ImageButton>(R.id.infoBtn_1)
+        val infoBtn2 = view.findViewById<ImageButton>(R.id.infoBtn_2)
+        val infoBtn3 = view.findViewById<ImageButton>(R.id.infoBtn_3)
+        val infoBtn4 = view.findViewById<ImageButton>(R.id.infoBtn_4)
+        val infoBtn5 = view.findViewById<ImageButton>(R.id.infoBtn_5)
+        val infoBtn6 = view.findViewById<ImageButton>(R.id.infoBtn_6)
 
         // Hides the UI elements immediately so the screen is pure black
         randomizeStayCords()
@@ -147,6 +149,23 @@ class DevFragment : Fragment() {
         }
 
         /**
+         * Info 1 logic
+         */
+        infoBtn1.setOnClickListener {
+            Log.d("VIA_Button", "Info 1 button pressed.")
+
+            // Build the unformatted body text
+            val bodyText =
+                "In here you'll find logs of all types, including:\n\n" +
+                    "1. Literally every action\n" +
+                    "2. TTS messages\n" +
+                    "3. Error messages from logcat"
+
+            // concatenate the formatted title and unformatted body
+            showMinimalDialog(android.text.TextUtils.concat("Logs".underlinedTitle(), bodyText))
+        }
+
+        /**
          * Audio button
          */
         audioBtn.setOnClickListener {
@@ -158,6 +177,20 @@ class DevFragment : Fragment() {
                 .commit()
 
             subFragmentContainer.visibility = View.VISIBLE
+        }
+
+        /**
+         * Info 2 logic
+         */
+        infoBtn2.setOnClickListener {
+            Log.d("VIA_Button", "Info 2 button pressed.")
+
+            val bodyText =
+                "In here you'll be able to control:\n\n" +
+                    "1. The Azure TTS reading speed\n" +
+                    "2. The ExoPlayer playing speed\n"
+
+            showMinimalDialog(android.text.TextUtils.concat("Audio Settings".underlinedTitle(), bodyText))
         }
 
         /**
@@ -175,6 +208,17 @@ class DevFragment : Fragment() {
         }
 
         /**
+         * Info 3 logic
+         */
+        infoBtn3.setOnClickListener {
+            Log.d("VIA_Button", "Info 3 button pressed.")
+            val bodyText =
+                "In here you'll be able to manually mark and unmark files as heard."
+
+            showMinimalDialog(android.text.TextUtils.concat("File Marking".underlinedTitle(), bodyText))
+        }
+
+        /**
          * File Marking button
          */
         fileMarkingBtn.setOnClickListener {
@@ -186,6 +230,19 @@ class DevFragment : Fragment() {
                 .commit()
 
             subFragmentContainer.visibility = View.VISIBLE
+        }
+
+        /**
+         * Info 4 logic
+         */
+        infoBtn4.setOnClickListener {
+            Log.d("VIA_Button", "Info 4 button pressed.")
+            val bodyText =
+                "In here you'll be able to:\n\n" +
+                        "1. Delete files\n" +
+                        "2. Reveal\\Hide files\n"
+
+            showMinimalDialog(android.text.TextUtils.concat("File Management".underlinedTitle(), bodyText))
         }
 
         /**
@@ -203,6 +260,17 @@ class DevFragment : Fragment() {
         }
 
         /**
+         * Info 5 logic
+         */
+        infoBtn5.setOnClickListener {
+            Log.d("VIA_Button", "Info 5 button pressed.")
+            val bodyText =
+                "עדיין אין לי ממש מושג זה אמור לעשות..\nנגלה בעתיד :^)"
+
+            showMinimalDialog(android.text.TextUtils.concat("Offline Mode".underlinedTitle(), bodyText))
+        }
+
+        /**
          * Statistics button
          */
         statisticsBtn.setOnClickListener {
@@ -214,6 +282,19 @@ class DevFragment : Fragment() {
                 .commit()
 
             subFragmentContainer.visibility = View.VISIBLE
+        }
+
+        /**
+         * Info 6 logic
+         */
+        infoBtn6.setOnClickListener {
+            Log.d("VIA_Button", "Info 6 button pressed.")
+            val bodyText =
+                "In here you'll be able to view:\n\n" +
+                        "1. Stats about \"הפעלת קול\", whatever that means\n" +
+                        "2. The Azure TTS token usage\n"
+
+            showMinimalDialog(android.text.TextUtils.concat("Statistics".underlinedTitle(), bodyText))
         }
     }
 
@@ -262,17 +343,6 @@ class DevFragment : Fragment() {
         }
     }
 
-    private fun appendLog(message: String) {
-        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-        val timestamp = timeFormat.format(Date())
-        val newLog = "[$timestamp] $message\n"
-
-        logTextView.append(newLog)
-        logScrollView.post {
-            logScrollView.fullScroll(ScrollView.FOCUS_DOWN)
-        }
-    }
-
     private fun randomizeStayCords() {
         toolbar.visibility = View.INVISIBLE
         paginationLayout.visibility = View.INVISIBLE
@@ -297,5 +367,40 @@ class DevFragment : Fragment() {
             stayBtn.visibility = View.VISIBLE
             Log.d("VIA_Admin", "Randomized verification button coordinates.")
         }
+    }
+
+    private fun showMinimalDialog(info: CharSequence) {
+        val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext(), R.style.CustomAlertDialogTheme)
+
+        builder.setMessage(info)
+            .setCancelable(true)
+            .setPositiveButton("Close") { dialog, _ ->
+                dialog.dismiss()
+            }
+
+        val dialog = builder.create()
+        dialog.show()
+
+        // Force the button to be greenTheme
+        val positiveButton = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+        positiveButton.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.greenTheme))
+    }
+
+    // Function for underlining and centering the title
+    private fun String.underlinedTitle(): SpannableString {
+        // Bake the colon and newlines into the title so the paragraph is isolated
+        val fullTitle = "$this\n\n"
+        val spannable = SpannableString(fullTitle)
+
+        // Underline the title
+        spannable.setSpan(UnderlineSpan(), 0, this.length, 0)
+
+        // Apply a center alignment span
+        spannable.setSpan(
+            android.text.style.AlignmentSpan.Standard(android.text.Layout.Alignment.ALIGN_CENTER),
+            0, fullTitle.length, 0
+        )
+
+        return spannable
     }
 }
