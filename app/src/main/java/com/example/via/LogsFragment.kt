@@ -21,9 +21,10 @@ class LogsFragment : Fragment() {
     private lateinit var logScrollView: ScrollView
     private lateinit var logsToolbar: androidx.appcompat.widget.Toolbar
 
-    private val PREFS_NAME = "AppLogPrefs"
-    private val KEY_LOGS = "saved_logs"
-    private val KEY_LAST_DATE = "last_log_date"
+    // lazy prefs
+    private val prefs by lazy {
+        requireContext().getSharedPreferences("LogPrefs", Context.MODE_PRIVATE)
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -56,10 +57,9 @@ class LogsFragment : Fragment() {
     }
 
     private fun loadLogs() {
-        val prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
         // Load the string and immediately trim any trailing invisible newlines
-        val savedText = prefs.getString(KEY_LOGS, "")?.trim() ?: ""
+        val savedText = prefs.getString("saved_logs", "")?.trim() ?: ""
         logTextView.text = savedText
 
         logScrollView.post {
@@ -80,11 +80,8 @@ class LogsFragment : Fragment() {
         // Grab the current text on screen first before changing anything
         val currentText = logTextView.text.toString().trim()
 
-        // Define prefs
-        val prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
         // Get the old date (default to an empty string)
-        val oldDate = prefs.getString(KEY_LAST_DATE, "")
+        val oldDate = prefs.getString("last_log_date", "")
 
         // Simple String comparison to see if it's a new day
         val isNewDay = (datestamp != oldDate)
@@ -108,11 +105,11 @@ class LogsFragment : Fragment() {
 
         // Save the trimmed string and the new date to storage
         prefs.edit {
-            putString(KEY_LOGS, updatedText)
+            putString("saved_logs", updatedText)
 
             // Only update the saved date if a new day actually started
             if (isNewDay) {
-                putString(KEY_LAST_DATE, datestamp)
+                putString("last_log_date", datestamp)
             }
         }
 

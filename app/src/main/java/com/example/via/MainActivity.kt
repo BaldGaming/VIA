@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
     private var loadedAudioIndex: Int = -1
 
     // Media controller & Shared preferences memory
-    private var mediaController: MediaController? = null
+    var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? =
         null // Tracks the connection to the background service
     private lateinit var prefs: SharedPreferences
@@ -356,12 +356,14 @@ class MainActivity : AppCompatActivity() {
             if (devTapCount == 7) {
                 Log.d("VIA_System", "7 taps detected: Opening Admin screen.")
 
-                findViewById<View>(R.id.fragment_dev).visibility = View.VISIBLE // Reveal the admin screen
+                findViewById<View>(R.id.fragment_dev).visibility =
+                    View.VISIBLE // Reveal the admin screen
 
                 speak("מַצַּב מְנַהֵל הופְעָל$dot יֵשׁ לָכֶם חָמֵשׁ שְׁנִיּוֹת לְאַשֵּׁר כְּנִיסָה לְמָסָךְ זֶה, אַחֶרֶת הָאַפְּלִיקַצְיָה תַּחֲזֹר לַמָּסָךְ הָרָאשִׁי.")
 
                 // Find the fragment and start the countdown sequence
-                val devFragment = supportFragmentManager.findFragmentById(R.id.fragment_dev) as? DevFragment
+                val devFragment =
+                    supportFragmentManager.findFragmentById(R.id.fragment_dev) as? DevFragment
                 devFragment?.startAdminTimeoutSequence()
 
                 devTapCount = 0 // Reset the counter
@@ -1002,7 +1004,7 @@ class MainActivity : AppCompatActivity() {
             Log.d("VIA_Audio", "Restoring track position from prefs: $savedPosition ms")
             controller.seekTo(savedPosition)
 
-            // Tells the Service Engine to start streaming!
+            // Tells the Service Engine to start streaming
             controller.prepare()
             controller.play()
         }
@@ -1426,14 +1428,24 @@ class MainActivity : AppCompatActivity() {
         // Waits for the connection to finish
         controllerFuture?.addListener({
             try {
-                // Once connected, assign the finished controller to our global variable!
+                // Once connected, assign the finished controller to our global variable
                 mediaController = controllerFuture?.get()
                 Log.d("VIA_System", "MediaController successfully bound to PlaybackService.")
 
-                // !!! (AS OF 05/7/2025 THIS IS NOT USED) !!!
-                // Sets the speed and pitch parameters for the ExoPlayer media controller
-                val playbackParameters = PlaybackParameters(1.0f, 1.0f) // Speed and pitch
+                // Get the audioPrefs
+                val audioPrefs = getSharedPreferences("AudioPrefs", MODE_PRIVATE)
+
+                // Read the saved speed (Default to 1.0f if the user has never changed the settings before)
+                val actualExoPlayerSpeed = audioPrefs.getFloat("saved_exo_speed", 1.0f)
+
+                // Apply it to the ExoPlayer media controller
+                val playbackParameters = PlaybackParameters(actualExoPlayerSpeed, 1.0f)
                 mediaController?.playbackParameters = playbackParameters
+
+                Log.d("VIA_System", "Booted ExoPlayer with saved speed: $actualExoPlayerSpeed")
+
+                // TODO: Add an update for the tts speed
+
 
                 // Attaches the listener to the controller
                 mediaController?.addListener(object : Player.Listener {
@@ -1564,7 +1576,7 @@ class MainActivity : AppCompatActivity() {
                                 currentAudioIndex = targetIndex
                                 updateSlidingWindow()
 
-                                // We no longer release the controller here, we just prep the next track!
+                                // We no longer release the controller here, we just prep the next track
                                 val cleanTitle = getCleanTitle(audioQueue[currentAudioIndex].title)
                                 shouldAutoPlayNext = true
                                 speak("הקובץ הסתיים, עובר לקובץ הבא. שם הקובץ הינו $cleanTitle")

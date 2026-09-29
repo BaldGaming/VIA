@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:clickable="true"
-    android:focusable="true"
     android:id="@+id/admin_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/adminBg"
-    tools:ignore="HardcodedText, VisualLintButtonSize"
-    tools:context=".DevFragment">
+    android:clickable="true"
+    android:focusable="true"
+    tools:context=".DevFragment"
+    tools:ignore="HardcodedText, VisualLintButtonSize">
 
     <!-- The Top Banner (Toolbar) -->
     <androidx.appcompat.widget.Toolbar
@@ -85,12 +84,12 @@
         android:id="@+id/page_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:gravity="center"
+        android:orientation="horizontal"
         android:padding="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
         <!-- Left Arrow (Previous Page) -->
         <ImageButton
@@ -98,11 +97,11 @@
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:background="@drawable/bg_circle"
-            android:src="@drawable/ic_arrow_back"
             android:contentDescription="Previous Page"
-            app:tint="@color/greenTheme"
             android:padding="12dp"
-            android:scaleType="fitCenter" />
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@color/greenTheme" />
 
         <!-- Page Number Indicator -->
         <TextView
@@ -121,12 +120,12 @@
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:background="@drawable/bg_circle"
-            android:src="@drawable/ic_arrow_back"
             android:contentDescription="Next Page"
-            android:rotation="180"
-            app:tint="@color/greenTheme"
             android:padding="12dp"
-            android:scaleType="fitCenter" />
+            android:rotation="180"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@color/greenTheme" />
 
     </LinearLayout>
 
@@ -136,12 +135,12 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:columnCount="2"
-        android:rowCount="3"
         android:padding="12dp"
-        app:layout_constraintTop_toBottomOf="@id/admin_toolbar"
+        android:rowCount="3"
         app:layout_constraintBottom_toTopOf="@id/page_layout"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/admin_toolbar">
 
         <!-- Cell 1 -->
         <FrameLayout
@@ -157,13 +156,13 @@
                 android:layout_height="match_parent"
                 android:backgroundTint="@color/adminBtn"
                 android:elevation="6dp"
-                app:cornerRadius="16dp"
-                app:rippleColor="@color/ripple"
                 android:text="Logs"
                 android:textAllCaps="false"
                 android:textColor="@color/greenTheme"
                 android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple" />
 
             <ImageButton
                 android:id="@+id/infoBtn_1"
@@ -173,12 +172,12 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_circle"
-                android:src="@drawable/ic_info"
                 android:contentDescription="Info for Logs"
-                app:tint="@color/greenTheme"
+                android:elevation="7dp"
                 android:padding="10dp"
                 android:scaleType="fitCenter"
-                android:elevation="7dp" />
+                android:src="@drawable/ic_info"
+                app:tint="@color/greenTheme" />
         </FrameLayout>
 
         <!-- Cell 2 -->
@@ -195,13 +194,13 @@
                 android:layout_height="match_parent"
                 android:backgroundTint="@color/adminBtn"
                 android:elevation="6dp"
-                app:cornerRadius="16dp"
-                app:rippleColor="@color/ripple"
                 android:text="Audio Settings"
                 android:textAllCaps="false"
                 android:textColor="@color/greenTheme"
                 android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple" />
 
             <ImageButton
                 android:id="@+id/infoBtn_2"
@@ -211,12 +210,12 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_circle"
-                android:src="@drawable/ic_info"
                 android:contentDescription="Info for Audio Settings"
-                app:tint="@color/greenTheme"
+                android:elevation="7dp"
                 android:padding="10dp"
                 android:scaleType="fitCenter"
-                android:elevation="7dp" />
+                android:src="@drawable/ic_info"
+                app:tint="@color/greenTheme" />
         </FrameLayout>
 
         <!-- Cell 3 -->
@@ -233,13 +232,13 @@
                 android:layout_height="match_parent"
                 android:backgroundTint="@color/adminBtn"
                 android:elevation="6dp"
-                app:cornerRadius="16dp"
-                app:rippleColor="@color/ripple"
                 android:text="File Marking"
                 android:textAllCaps="false"
                 android:textColor="@color/greenTheme"
                 android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple" />
 
             <ImageButton
                 android:id="@+id/infoBtn_3"
@@ -249,12 +248,12 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_circle"
-                android:src="@drawable/ic_info"
                 android:contentDescription="Info for File Marking"
-                app:tint="@color/greenTheme"
+                android:elevation="7dp"
                 android:padding="10dp"
                 android:scaleType="fitCenter"
-                android:elevation="7dp" />
+                android:src="@drawable/ic_info"
+                app:tint="@color/greenTheme" />
         </FrameLayout>
 
         <!-- Cell 4 -->
@@ -271,13 +270,13 @@
                 android:layout_height="match_parent"
                 android:backgroundTint="@color/adminBtn"
                 android:elevation="6dp"
-                app:cornerRadius="16dp"
-                app:rippleColor="@color/ripple"
                 android:text="File Management"
                 android:textAllCaps="false"
                 android:textColor="@color/greenTheme"
                 android:textSize="20sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple" />
 
             <ImageButton
                 android:id="@+id/infoBtn_4"
@@ -287,12 +286,12 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_circle"
-                android:src="@drawable/ic_info"
                 android:contentDescription="Info for File Management"
-                app:tint="@color/greenTheme"
+                android:elevation="7dp"
                 android:padding="10dp"
                 android:scaleType="fitCenter"
-                android:elevation="7dp" />
+                android:src="@drawable/ic_info"
+                app:tint="@color/greenTheme" />
         </FrameLayout>
 
         <!-- Cell 5 -->
@@ -309,13 +308,13 @@
                 android:layout_height="match_parent"
                 android:backgroundTint="@color/adminBtn"
                 android:elevation="6dp"
-                app:cornerRadius="16dp"
-                app:rippleColor="@color/ripple"
                 android:text="Offline Mode"
                 android:textAllCaps="false"
                 android:textColor="@color/greenTheme"
                 android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple" />
 
             <ImageButton
                 android:id="@+id/infoBtn_5"
@@ -325,12 +324,12 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_circle"
-                android:src="@drawable/ic_info"
                 android:contentDescription="Info for Offline Mode"
-                app:tint="@color/greenTheme"
+                android:elevation="7dp"
                 android:padding="10dp"
                 android:scaleType="fitCenter"
-                android:elevation="7dp" />
+                android:src="@drawable/ic_info"
+                app:tint="@color/greenTheme" />
         </FrameLayout>
 
         <!-- Cell 6 -->
@@ -347,13 +346,13 @@
                 android:layout_height="match_parent"
                 android:backgroundTint="@color/adminBtn"
                 android:elevation="6dp"
-                app:cornerRadius="16dp"
-                app:rippleColor="@color/ripple"
                 android:text="Statistics"
                 android:textAllCaps="false"
                 android:textColor="@color/greenTheme"
                 android:textSize="22sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                app:cornerRadius="16dp"
+                app:rippleColor="@color/ripple" />
 
             <ImageButton
                 android:id="@+id/infoBtn_6"
@@ -363,12 +362,12 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_circle"
-                android:src="@drawable/ic_info"
                 android:contentDescription="Info for Statistics"
-                app:tint="@color/greenTheme"
+                android:elevation="7dp"
                 android:padding="10dp"
                 android:scaleType="fitCenter"
-                android:elevation="7dp" />
+                android:src="@drawable/ic_info"
+                app:tint="@color/greenTheme" />
         </FrameLayout>
 
     </GridLayout>

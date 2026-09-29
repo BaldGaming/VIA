@@ -63,32 +63,34 @@ class DevFragment : Fragment() {
         }
 
         // Handles the system back swipe while the Admin screen is active
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                val devContainer = activity?.findViewById<View>(R.id.fragment_dev)
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    val devContainer = activity?.findViewById<View>(R.id.fragment_dev)
 
-                if (devContainer?.visibility == View.VISIBLE) {
-                    if (childFragmentManager.backStackEntryCount > 0) {
-                        Log.d("VIA_Admin", "Back swipe intercepted: Popping sub-fragment.")
-                        childFragmentManager.popBackStack()
-                    } else {
-                        Log.d("VIA_Admin", "Back swipe intercepted: Closing Admin dashboard.")
-                        devContainer.visibility = View.GONE
-                        countdownJob?.cancel()
+                    if (devContainer?.visibility == View.VISIBLE) {
+                        if (childFragmentManager.backStackEntryCount > 0) {
+                            Log.d("VIA_Admin", "Back swipe intercepted: Popping sub-fragment.")
+                            childFragmentManager.popBackStack()
+                        } else {
+                            Log.d("VIA_Admin", "Back swipe intercepted: Closing Admin dashboard.")
+                            devContainer.visibility = View.GONE
+                            countdownJob?.cancel()
 
-                        val mainActivity = activity as? MainActivity
-                        if (mainActivity?.isVoiceBusy == true && toolbar.visibility != View.VISIBLE) {
-                            Log.d("VIA_TTS", "User exited during warning TTS. Triggering gag.")
-                            mainActivity.speak("לא יפה, תיתן לי לסיים לדבר.")
+                            val mainActivity = activity as? MainActivity
+                            if (mainActivity?.isVoiceBusy == true && toolbar.visibility != View.VISIBLE) {
+                                Log.d("VIA_TTS", "User exited during warning TTS. Triggering gag.")
+                                mainActivity.speak("לא יפה, תיתן לי לסיים לדבר.")
+                            }
                         }
+                    } else {
+                        isEnabled = false
+                        requireActivity().onBackPressedDispatcher.onBackPressed()
+                        isEnabled = true
                     }
-                } else {
-                    isEnabled = false
-                    requireActivity().onBackPressedDispatcher.onBackPressed()
-                    isEnabled = true
                 }
-            }
-        })
+            })
 
         // Find the views by their IDs
         logTextView = view.findViewById(R.id.logTextView)
@@ -157,9 +159,9 @@ class DevFragment : Fragment() {
             // Build the unformatted body text
             val bodyText =
                 "In here you'll find logs of all types, including:\n\n" +
-                    "1. Literally every action\n" +
-                    "2. TTS messages\n" +
-                    "3. Error messages from logcat"
+                        "1. Literally every action\n" +
+                        "2. TTS messages\n" +
+                        "3. Error messages from logcat"
 
             // concatenate the formatted title and unformatted body
             showMinimalDialog(android.text.TextUtils.concat("Logs".underlinedTitle(), bodyText))
@@ -187,10 +189,15 @@ class DevFragment : Fragment() {
 
             val bodyText =
                 "In here you'll be able to control:\n\n" +
-                    "1. The Azure TTS reading speed\n" +
-                    "2. The ExoPlayer playing speed\n"
+                        "1. The Azure TTS reading speed\n" +
+                        "2. The ExoPlayer playing speed\n"
 
-            showMinimalDialog(android.text.TextUtils.concat("Audio Settings".underlinedTitle(), bodyText))
+            showMinimalDialog(
+                android.text.TextUtils.concat(
+                    "Audio Settings".underlinedTitle(),
+                    bodyText
+                )
+            )
         }
 
         /**
@@ -215,7 +222,12 @@ class DevFragment : Fragment() {
             val bodyText =
                 "In here you'll be able to manually mark and unmark files as heard."
 
-            showMinimalDialog(android.text.TextUtils.concat("File Marking".underlinedTitle(), bodyText))
+            showMinimalDialog(
+                android.text.TextUtils.concat(
+                    "File Marking".underlinedTitle(),
+                    bodyText
+                )
+            )
         }
 
         /**
@@ -242,7 +254,12 @@ class DevFragment : Fragment() {
                         "1. Delete files\n" +
                         "2. Reveal\\Hide files\n"
 
-            showMinimalDialog(android.text.TextUtils.concat("File Management".underlinedTitle(), bodyText))
+            showMinimalDialog(
+                android.text.TextUtils.concat(
+                    "File Management".underlinedTitle(),
+                    bodyText
+                )
+            )
         }
 
         /**
@@ -267,7 +284,12 @@ class DevFragment : Fragment() {
             val bodyText =
                 "עדיין אין לי ממש מושג זה אמור לעשות..\nנגלה בעתיד :^)"
 
-            showMinimalDialog(android.text.TextUtils.concat("Offline Mode".underlinedTitle(), bodyText))
+            showMinimalDialog(
+                android.text.TextUtils.concat(
+                    "Offline Mode".underlinedTitle(),
+                    bodyText
+                )
+            )
         }
 
         /**
@@ -294,7 +316,12 @@ class DevFragment : Fragment() {
                         "1. Stats about \"הפעלת קול\", whatever that means\n" +
                         "2. The Azure TTS token usage\n"
 
-            showMinimalDialog(android.text.TextUtils.concat("Statistics".underlinedTitle(), bodyText))
+            showMinimalDialog(
+                android.text.TextUtils.concat(
+                    "Statistics".underlinedTitle(),
+                    bodyText
+                )
+            )
         }
     }
 
@@ -370,7 +397,10 @@ class DevFragment : Fragment() {
     }
 
     private fun showMinimalDialog(info: CharSequence) {
-        val builder = androidx.appcompat.app.AlertDialog.Builder(requireContext(), R.style.CustomAlertDialogTheme)
+        val builder = androidx.appcompat.app.AlertDialog.Builder(
+            requireContext(),
+            R.style.CustomAlertDialogTheme
+        )
 
         builder.setMessage(info)
             .setCancelable(true)
@@ -383,7 +413,12 @@ class DevFragment : Fragment() {
 
         // Force the button to be greenTheme
         val positiveButton = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
-        positiveButton.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.greenTheme))
+        positiveButton.setTextColor(
+            androidx.core.content.ContextCompat.getColor(
+                requireContext(),
+                R.color.greenTheme
+            )
+        )
     }
 
     // Function for underlining and centering the title

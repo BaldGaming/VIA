@@ -64,10 +64,6 @@ android {
     namespace = "com.example.via"
     compileSdk = 36
 
-    viewBinding { // Something to do with back press implementation
-        enable = true
-    }
-
     defaultConfig {
         applicationId = "com.example.via"
         minSdk = 26
@@ -103,6 +99,8 @@ android {
 
     buildFeatures {
         buildConfig = true
+        viewBinding = true
+        dataBinding = true
     }
 
     buildTypes {
@@ -120,11 +118,20 @@ android {
     }
 }
 
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+}
+
 dependencies {
     // Dropbox API fetching
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     // JSON translator
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
+
+    // Sliding number picker
+    implementation("io.github.ShawnLin013:number-picker:2.4.13")
 
     implementation("androidx.media3:media3-session:1.9.2")
     implementation("androidx.media3:media3-exoplayer:1.9.2") // media player shit

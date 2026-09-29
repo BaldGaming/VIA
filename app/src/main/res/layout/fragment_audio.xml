@@ -1,12 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/audio_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/adminBg"
-    tools:context=".AudioFragment">
+    android:clickable="true"
+    android:focusable="true"
+    tools:context=".AudioFragment"
+    tools:ignore="HardcodedText, VisualLintButtonSize">
+
+    <TextView
+        android:id="@+id/tts_speed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:text="TTS Speed"
+        android:textColor="@color/text"
+        app:layout_constraintBottom_toTopOf="@+id/tts_number_picker"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.903"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/audio_toolbar"
+        app:layout_constraintVertical_bias="0.0" />
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/audio_toolbar"
@@ -19,5 +36,82 @@
         app:navigationIcon="@drawable/ic_arrow_back"
         app:title="Audio Settings"
         app:titleTextColor="@color/black" />
+
+    <com.shawnlin.numberpicker.NumberPicker
+        android:id="@+id/exoplayer_number_picker"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.106"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/audio_toolbar"
+        app:layout_constraintVertical_bias="0.112"
+        app:np_dividerColor="@color/greenTheme"
+        app:np_height="180dp"
+        app:np_selectedTextColor="@color/text"
+        app:np_selectedTextSize="24sp"
+        app:np_textColor="@color/text"
+        app:np_textSize="18sp"
+        app:np_width="64dp" />
+
+    <com.shawnlin.numberpicker.NumberPicker
+        android:id="@+id/tts_number_picker"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.904"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/audio_toolbar"
+        app:layout_constraintVertical_bias="0.11"
+        app:np_dividerColor="@color/greenTheme"
+        app:np_height="180dp"
+        app:np_selectedTextColor="@color/text"
+        app:np_selectedTextSize="24sp"
+        app:np_textColor="@color/text"
+        app:np_textSize="18sp"
+        app:np_width="64dp" />
+
+    <TextView
+        android:id="@+id/exoplayer_speed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:text="ExoPlayer Speed"
+        android:textColor="@color/text"
+        app:layout_constraintBottom_toTopOf="@+id/exoplayer_number_picker"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.052"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/audio_toolbar"
+        app:layout_constraintVertical_bias="0.0" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guideline3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <Button
+        android:id="@+id/saveBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="278dp"
+        android:backgroundTint="@color/adminBtn"
+        android:text="Save"
+        android:textColor="@color/greenTheme"
+        android:textStyle="bold"
+        app:cornerRadius="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/audio_toolbar"
+        app:layout_constraintVertical_bias="0.126"
+        app:rippleColor="@color/ripple" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

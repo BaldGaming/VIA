@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:clickable="true"
-    android:focusable="true"
     android:id="@+id/logs_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/adminBg"
-    tools:ignore="HardcodedText, VisualLintButtonSize"
-    tools:context=".LogsFragment">
+    android:clickable="true"
+    android:focusable="true"
+    tools:context=".LogsFragment"
+    tools:ignore="HardcodedText, VisualLintButtonSize">
 
     <!-- The Top Banner (Toolbar) -->
     <androidx.appcompat.widget.Toolbar
@@ -41,12 +40,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
+            android:fontFeatureSettings="tnum"
+            android:gravity="left|top"
             android:padding="16dp"
             android:textColor="@color/text"
-            android:textSize="14sp"
             android:textDirection="ltr"
-            android:gravity="left|top"
-            android:fontFeatureSettings="tnum" />
+            android:textSize="14sp" />
     </ScrollView>
 
     <!-- The Test Log Button -->
@@ -57,8 +56,8 @@
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="16dp"
         android:backgroundTint="@color/adminBtn"
-        android:textColor="@color/greenTheme"
         android:text="log"
+        android:textColor="@color/greenTheme"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
