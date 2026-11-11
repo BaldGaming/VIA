@@ -29,7 +29,6 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -55,6 +54,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -164,9 +164,9 @@ class MainActivity : AppCompatActivity() {
                         keepScreenAwake(false)
                     }
                 })
-                Log.d("VIA_TTS", "Fallback offline TTS Engine Initialized successfully.")
+                Timber.d("VIA_TTS: Fallback offline TTS Engine Initialized successfully.")
             } else {
-                Log.e("VIA_TTS", "Failed to initialize offline TTS Engine.")
+                Timber.e("VIA_TTS: Failed to initialize offline TTS Engine.")
             }
         }
 
@@ -175,7 +175,7 @@ class MainActivity : AppCompatActivity() {
             override fun handleOnBackPressed() {
                 // Checks if the back button was pressed twice within 2 seconds
                 if (pressedTime + 2000 > System.currentTimeMillis()) {
-                    Log.d("VIA_System", "Double-tap back registered. Exiting app.")
+                    Timber.d("VIA_System: Double-tap back registered. Exiting app.")
                     finish() // Closes the app completely
                 } else {
                     // Notifies the user to press again
@@ -202,7 +202,7 @@ class MainActivity : AppCompatActivity() {
 
         // Loads the last saved audio file index if exists. Else, defaults to the first file.
         currentAudioIndex = prefs.getInt("last_active_index", 0)
-        Log.i("VIA_System", "Booting up. Loaded last known index: $currentAudioIndex")
+        Timber.i("VIA_System: Booting up. Loaded last known index: $currentAudioIndex")
 
         // Buttons
         val playBtn = findViewById<Button>(R.id.button1) // Play / Pause / Marked as heard.
@@ -252,7 +252,7 @@ class MainActivity : AppCompatActivity() {
          * Play logic
          */
         playBtn.setOnClickListener { // tap
-            Log.d("VIA_Button", "Play/Pause tapped")
+            Timber.d("VIA_Button: Play/Pause tapped")
             vibrate()
 
             // Cancels active TTS requests
@@ -266,7 +266,7 @@ class MainActivity : AppCompatActivity() {
             // Waits until playlist is downloaded
             if (audioQueue.isEmpty()) {
                 speak("רשימת הקבצים עדיין בטעינה, אנא המתן")
-                Log.w("VIA_Audio", "Playback blocked: audioQueue is empty")
+                Timber.w("VIA_Audio: Playback blocked: audioQueue is empty")
                 return@setOnClickListener
             }
 
@@ -276,7 +276,7 @@ class MainActivity : AppCompatActivity() {
             // Pauses the player and saves position if already playing
             if (currentPlayer != null && currentPlayer.isPlaying) {
                 pauseAudio()
-                Log.d("VIA_Audio", "Audio paused manually")
+                Timber.d("VIA_Audio: Audio paused manually")
             }
 
             // Checks if a song is loaded and verifies it matches the current UI index
@@ -286,7 +286,7 @@ class MainActivity : AppCompatActivity() {
                 // Starts wakeLock with a 4-hour timeout (14400000ms) to save battery if forgotten
                 if (wakeLock?.isHeld == false)
                     wakeLock?.acquire(14400000L)
-                Log.d("VIA_Audio", "Audio resumed manually")
+                Timber.d("VIA_Audio: Audio resumed manually")
             }
 
             // Creates and plays audio if no player exists at all
@@ -294,12 +294,12 @@ class MainActivity : AppCompatActivity() {
                 startPlaybackWorkflow()
                 // Starts wakeLock with a 4-hour timeout (14400000ms) to save battery if forgotten
                 if (wakeLock?.isHeld == false) wakeLock?.acquire(14400000L)
-                Log.d("VIA_Audio", "Audio started workflow")
+                Timber.d("VIA_Audio: Audio started workflow")
             }
         }
 
         playBtn.setOnLongClickListener { // long press (about 500ms)
-            Log.d("VIA_Button", "Play/Pause held")
+            Timber.d("VIA_Button: Play/Pause held")
             vibrate()
 
             // Cancels active TTS requests
@@ -319,11 +319,11 @@ class MainActivity : AppCompatActivity() {
                 prefs.edit { putBoolean("heard_$currentPath", newHeardState) }
 
                 if (newHeardState) {
-                    Log.i("VIA_System", "File manually marked as HEARD: $currentPath")
+                    Timber.i("VIA_System: File manually marked as HEARD: $currentPath")
                     speak("הקובץ סומן כהושמע")
                     syncHeardStatusToDropbox(currentPath) // Call sync function
                 } else {
-                    Log.i("VIA_System", "File manually marked as UNHEARD: $currentPath")
+                    Timber.i("VIA_System: File manually marked as UNHEARD: $currentPath")
                     speak("הסימון התבטל")
                     unsyncHeardStatusToDropbox(currentPath) // Call unsync function
                 }
@@ -337,7 +337,7 @@ class MainActivity : AppCompatActivity() {
          * Title logic
          */
         titleBtn.setOnClickListener { // tap
-            Log.d("VIA_Button", "Title tapped")
+            Timber.d("VIA_Button: Title tapped")
             vibrate()
 
             val currentTime = System.currentTimeMillis()
@@ -354,7 +354,7 @@ class MainActivity : AppCompatActivity() {
 
             // The counter check
             if (devTapCount == 7) {
-                Log.d("VIA_System", "7 taps detected: Opening Admin screen.")
+                Timber.d("VIA_System: 7 taps detected: Opening Admin screen.")
 
                 findViewById<View>(R.id.fragment_dev).visibility =
                     View.VISIBLE // Reveal the admin screen
@@ -376,7 +376,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         titleBtn.setOnLongClickListener { // long press (about 500ms)
-            Log.d("VIA_Button", "Title held")
+            Timber.d("VIA_Button: Title held")
             vibrate()
 
             speak("אתה משתמש באפליקציה בשם וי אה$dot כפתור ירוק: לחיצה תתחיל ותפסיק את השמע$comma ולחיצה ארוכה תסמן כנשמע$dot כפתור אדום: תקריא את הכותרת$comma ולחיצה ארוכה תשמיע את כל הכפתורים$dot כפתור כחול: מעביר לערוץ הבא$dot כפתור צהוב: מעביר לערוץ הקודם$comma ולחיצה ארוכה תעביר לתחילת הקובץ$dot לחיצה על כחול וצהוב יחד ירענן את הרשימה$dot כפתור ורוד: מעביר לקובץ הבא$comma ולחיצה ארוכה יעביר לקובץ הבא שלא הושמע עדיין$dot כפתור לבן: מעביר לקובץ קודם$comma ולחיצה ארוכה תעביר לתחילת הרשימה$dot לחיצה על ורוד ולבן יחד תסגור את האפליקציה$dot עבור הסברים נוספים$comma תפנה לירדן$dot")
@@ -389,16 +389,16 @@ class MainActivity : AppCompatActivity() {
          * Next Channel logic
          */
         forwardBtn.setOnClickListener { // tap
-            Log.d("VIA_Button", "Forward tapped - Channel Up")
+            Timber.d("VIA_Button: Forward tapped - Channel Up")
             hopChannel(1)
         }
 
         forwardBtn.setOnLongClickListener { // long press
-            Log.d("VIA_Button", "Channel up held")
+            Timber.d("VIA_Button: Channel up held")
             vibrate()
 
             if (rewindBtn.isPressed) {
-                Log.d("VIA_System", "Dual-hold detected: Refreshing audio list")
+                Timber.d("VIA_System: Dual-hold detected: Refreshing audio list")
                 refreshLibrary(apiService, true) // true means user requested it
                 speak("האפליקציה בודקת אם יש עדכון ברשימת הקבצים")
                 true
@@ -412,16 +412,16 @@ class MainActivity : AppCompatActivity() {
          * Previous Channel logic
          */
         rewindBtn.setOnClickListener { // tap
-            Log.d("VIA_Button", "Channel Down tapped")
+            Timber.d("VIA_Button: Channel Down tapped")
             hopChannel(-1)
         }
 
         rewindBtn.setOnLongClickListener { // long press (about 500ms)
-            Log.d("VIA_Button", "Channel down held")
+            Timber.d("VIA_Button: Channel down held")
             vibrate()
 
             if (forwardBtn.isPressed) {
-                Log.d("VIA_System", "Dual-hold detected: Refreshing audio list")
+                Timber.d("VIA_System: Dual-hold detected: Refreshing audio list")
                 refreshLibrary(apiService, true) // true means user requested it
                 speak("האפליקציה בודקת אם יש עדכון ברשימת הקבצים")
                 true
@@ -436,7 +436,7 @@ class MainActivity : AppCompatActivity() {
                     // Updates the SharedPreferences to reflect this reset
                     val audioPath = audioQueue[currentAudioIndex].path
                     prefs.edit { putInt("last_pos_$audioPath", 0) }
-                    Log.d("VIA_Audio", "Track position reset to 0 for: $audioPath")
+                    Timber.d("VIA_Audio: Track position reset to 0 for: $audioPath")
                 }
                 speak("חזרתא לתחילת הקובץ.")
                 true
@@ -448,7 +448,7 @@ class MainActivity : AppCompatActivity() {
          * Next logic
          */
         nextBtn.setOnClickListener { // tap
-            Log.d("VIA_Button", "Next tapped")
+            Timber.d("VIA_Button: Next tapped")
             vibrate()
 
             // Checks if we are not at the last audio file
@@ -469,7 +469,7 @@ class MainActivity : AppCompatActivity() {
 
             } else {
                 speak("הגעת לסוף הרשימה")
-                Log.d("VIA_Audio", "End of playlist reached")
+                Timber.d("VIA_Audio: End of playlist reached")
             }
         }
 
@@ -478,12 +478,12 @@ class MainActivity : AppCompatActivity() {
 
             // If White is already being held down
             if (previousBtn.isPressed) {
-                Log.d("VIA_System", "Dual-hold detected: Exiting app")
+                Timber.d("VIA_System: Dual-hold detected: Exiting app")
                 exitAppWorkflow()
                 true
             } else {
                 // Normal skip-to-unheard logic
-                Log.d("VIA_Button", "Next held - Seeking unheard track")
+                Timber.d("VIA_Button: Next held - Seeking unheard track")
                 var targetIndex = -1
                 for (i in currentAudioIndex + 1 until audioQueue.size) {
                     if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
@@ -500,14 +500,14 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 if (targetIndex != -1) {
-                    Log.d("VIA_System", "Found unheard track at index $targetIndex")
+                    Timber.d("VIA_System: Found unheard track at index $targetIndex")
                     pauseAudio()
                     currentAudioIndex = targetIndex
 
                     updateSlidingWindow()
                     readCurrentTitle()
                 } else {
-                    Log.d("VIA_System", "No unheard tracks remaining in queue.")
+                    Timber.d("VIA_System: No unheard tracks remaining in queue.")
                     speak("כל הקבצים סומנו כהושלמו")
                 }
                 true
@@ -519,7 +519,7 @@ class MainActivity : AppCompatActivity() {
          * Previous logic
          */
         previousBtn.setOnClickListener { // tap
-            Log.d("VIA_Button", "Previous tapped")
+            Timber.d("VIA_Button: Previous tapped")
             vibrate()
 
             // Checks if we are not at the first audio file
@@ -539,7 +539,7 @@ class MainActivity : AppCompatActivity() {
 
             } else {
                 speak("הגעת לתחילת הרשימה")
-                Log.d("VIA_Audio", "Start of playlist reached")
+                Timber.d("VIA_Audio: Start of playlist reached")
             }
         }
 
@@ -548,12 +548,12 @@ class MainActivity : AppCompatActivity() {
 
             // If Pink is already being held down
             if (nextBtn.isPressed) {
-                Log.d("VIA_System", "Dual-hold detected: Exiting app")
+                Timber.d("VIA_System: Dual-hold detected: Exiting app")
                 exitAppWorkflow()
                 true
             } else {
                 // Normal reset-to-start logic
-                Log.d("VIA_Button", "Previous held")
+                Timber.d("VIA_Button: Previous held")
                 speak("חוזר לתחילת הרשימה")
                 currentAudioIndex = 0
 
@@ -580,7 +580,7 @@ class MainActivity : AppCompatActivity() {
 
         }.filter { it in 10..99 }.toSortedSet().toList()
 
-        Log.d("VIA_System", "HopChannel: Detected active channels in library: $availableChannels")
+        Timber.d("VIA_System: HopChannel: Detected active channels in library: $availableChannels")
 
         if (availableChannels.isEmpty()) {
             speak("אין ערוצים זמינים")
@@ -599,10 +599,7 @@ class MainActivity : AppCompatActivity() {
             if (nextChannel != null) {
                 targetChannel = nextChannel
             } else {
-                Log.d(
-                    "VIA_System",
-                    "HopChannel: User at max channel ($currentChannel), cannot go up."
-                )
+                Timber.d("VIA_System: HopChannel: User at max channel ($currentChannel), cannot go up.")
                 vibrate()
                 speak("ערוץ מספר $currentChannel הוא הערוץ הגבוה ביותר כרגע")
                 return
@@ -613,10 +610,7 @@ class MainActivity : AppCompatActivity() {
             if (prevChannel != null) {
                 targetChannel = prevChannel
             } else {
-                Log.d(
-                    "VIA_System",
-                    "HopChannel: User at min channel ($currentChannel), cannot go down."
-                )
+                Timber.d("VIA_System: HopChannel: User at min channel ($currentChannel), cannot go down.")
                 vibrate()
                 speak("ערוץ מספר $currentChannel הוא הערוץ הנמוך ביותר כרגע")
                 return
@@ -644,18 +638,12 @@ class MainActivity : AppCompatActivity() {
             for (i in channelStartIndex..channelEndIndex) {
                 if (!prefs.getBoolean("heard_${audioQueue[i].path}", false)) {
                     targetIndex = i
-                    Log.d(
-                        "VIA_System",
-                        "HopChannel: Found unheard track at index $targetIndex within Channel $targetChannel"
-                    )
+                    Timber.d("VIA_System: HopChannel: Found unheard track at index $targetIndex within Channel $targetChannel")
                     break
                 }
             }
 
-            Log.d(
-                "VIA_System",
-                "HopChannel: Jumping to index $targetIndex (Channel $targetChannel)"
-            )
+            Timber.d("VIA_System: HopChannel: Jumping to index $targetIndex (Channel $targetChannel)")
             vibrate()
             pauseAudio()
 
@@ -763,10 +751,7 @@ class MainActivity : AppCompatActivity() {
         )
         staticStrings.forEach { prefetchTTS(it) }
 
-        Log.d(
-            "VIA_TTS",
-            "Sliding window prefetch complete. Cache deletion disabled to preserve Azure tokens."
-        )
+        Timber.d("VIA_TTS: Sliding window prefetch complete. Cache deletion disabled to preserve Azure tokens.")
     }
 
     // TTS function
@@ -794,7 +779,7 @@ class MainActivity : AppCompatActivity() {
 
         // Plays instantly if the file is already downloaded
         if (cachedVoiceFile.exists()) {
-            Log.i("VIA_TTS", "Local Cache HIT for text hash: ${text.hashCode()}")
+            Timber.i("VIA_TTS: Local Cache HIT for text hash: ${text.hashCode()}")
             playVoiceFile(cachedVoiceFile, onComplete)
             return
         }
@@ -817,7 +802,7 @@ class MainActivity : AppCompatActivity() {
         val newCount = currentCount + text.length
         prefs.edit { putInt("tts_char_count", newCount) }
 
-        Log.i("VIA_TTS", "Monthly Azure Characters Used: $newCount / 500000")
+        Timber.i("VIA_TTS: Monthly Azure Characters Used: $newCount / 500000")
 
         // Creates a separate Retrofit instance for the Azure endpoint
         val azureRetrofit = Retrofit.Builder()
@@ -857,14 +842,14 @@ class MainActivity : AppCompatActivity() {
                         playVoiceFile(cachedVoiceFile, onComplete)
                     }
                 } else {
-                    Log.e("VIA_TTS", "Azure Error: ${response.code()} - ${response.message()}")
+                    Timber.e("VIA_TTS: Azure Error: ${response.code()} - ${response.message()}")
                     // Falls back to Android TTS if Azure rejects the request (Note the added "VIA_ID")
                     fallbackTts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "VIA_ID")
                 }
             } catch (e: Exception) {
                 // Ignores cancellation exceptions
                 if (e !is kotlinx.coroutines.CancellationException) {
-                    Log.e("VIA_TTS", "Failed to connect to Azure: ${e.message}")
+                    Timber.e("VIA_TTS: Failed to connect to Azure: ${e.message}")
                     // Falls back to Android TTS if internet drops (Note the added "VIA_ID")
                     fallbackTts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "VIA_ID")
                 }
@@ -886,7 +871,7 @@ class MainActivity : AppCompatActivity() {
                 // Checks if the system is waiting to autoplay the next track
                 if (shouldAutoPlayNext) {
                     shouldAutoPlayNext = false // Resets the flag
-                    Log.d("VIA_Audio", "TTS complete. Auto-playing next track in sequence.")
+                    Timber.d("VIA_Audio: TTS complete. Auto-playing next track in sequence.")
                     findViewById<Button>(R.id.button1).performClick() // Clicks play
                 }
             }
@@ -920,7 +905,7 @@ class MainActivity : AppCompatActivity() {
         val newCount = currentCount + text.length
         prefs.edit { putInt("tts_char_count", newCount) }
 
-        Log.i("VIA_TTS", "Monthly Azure Characters Used: $newCount / 500000 (Prefetch)")
+        Timber.i("VIA_TTS: Monthly Azure Characters Used: $newCount / 500000 (Prefetch)")
 
         val azureRetrofit = Retrofit.Builder()
             .baseUrl("https://${BuildConfig.AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/")
@@ -946,21 +931,20 @@ class MainActivity : AppCompatActivity() {
                 if (response.isSuccessful) {
                     response.body()?.bytes()?.let { audioBytes ->
                         FileOutputStream(cachedVoiceFile).use { it.write(audioBytes) }
-                        Log.d(
-                            "VIA_TTS",
-                            "Silently pre-fetched TTS to local storage for hash: ${text.hashCode()}"
+                        Timber.d(
+                            "VIA_TTS: Silently pre-fetched TTS to local storage for hash: ${text.hashCode()}"
                         )
                     }
                 }
             } catch (_: Exception) {
-                Log.e("VIA_TTS", "Silent pre-fetch failed for hash: ${text.hashCode()}")
+                Timber.e("VIA_TTS: Silent pre-fetch failed for hash: ${text.hashCode()}")
             }
         }
     }
 
     // Cleans up memory and services when the app is completely destroyed
     override fun onDestroy() {
-        Log.i("VIA_System", "App completely destroyed. Releasing all resources.")
+        Timber.i("VIA_System: App completely destroyed. Releasing all resources.")
         ttsJob?.cancel()
         progressJob?.cancel() // Stops the background progress tracker
         voicePlayer?.release()
@@ -1001,7 +985,7 @@ class MainActivity : AppCompatActivity() {
             // Restores position
             val savedPosition =
                 prefs.getInt("last_pos_${audioQueue[currentAudioIndex].path}", 0).toLong()
-            Log.d("VIA_Audio", "Restoring track position from prefs: $savedPosition ms")
+            Timber.d("VIA_Audio: Restoring track position from prefs: $savedPosition ms")
             controller.seekTo(savedPosition)
 
             // Tells the Service Engine to start streaming
@@ -1038,10 +1022,7 @@ class MainActivity : AppCompatActivity() {
             // Safely releases the CPU WakeLock so it doesn't drain the battery
             if (wakeLock?.isHeld == true) wakeLock?.release()
 
-            Log.d(
-                "VIA_Audio",
-                "Track PAUSED at $rawPosition ms, saved overlapping position as $adjustedPosition ms"
-            )
+            Timber.d("VIA_Audio: Track PAUSED at $rawPosition ms, saved overlapping position as $adjustedPosition ms")
         }
     }
 
@@ -1054,16 +1035,16 @@ class MainActivity : AppCompatActivity() {
                 if (token.isEmpty()) return@launch
 
                 val currentFile = audioQueue[currentAudioIndex]
-                Log.d("VIA_Dropbox", "Requesting temporary streaming link for: ${currentFile.path}")
+                Timber.d("VIA_Dropbox: Requesting temporary streaming link for: ${currentFile.path}")
 
                 // Asks Dropbox for a direct streaming link
                 val linkResponse =
                     apiService.getTemporaryLink(token, TempLinkRequest(currentFile.path))
 
-                Log.i("VIA_Dropbox", "Streaming link fetched successfully.")
+                Timber.i("VIA_Dropbox: Streaming link fetched successfully.")
                 playAudio(linkResponse.link) // Now we play the valid link
             } catch (e: Exception) {
-                Log.e("VIA_Dropbox", "Failed to fetch streaming link: ${e.message}")
+                Timber.e("VIA_Dropbox: Failed to fetch streaming link: ${e.message}")
                 speak("שגיאה בהפעלת הקובץ")
             }
         }
@@ -1074,7 +1055,7 @@ class MainActivity : AppCompatActivity() {
 
         // If it's already running, instantly reject the duplicate request
         if (isRefreshing) {
-            Log.w("VIA_System", "Refresh already in progress. Ignoring duplicate multi-touch call.")
+            Timber.w("VIA_System: Refresh already in progress. Ignoring duplicate multi-touch call.")
             return
         }
 
@@ -1083,7 +1064,7 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                Log.d("VIA_System", "Starting full library refresh cycle.")
+                Timber.d("VIA_System: Starting full library refresh cycle.")
                 // Validates the token before scanning the folder
                 val token = DropboxAuth.getValidToken(apiService)
                 if (token.isEmpty()) return@launch
@@ -1126,11 +1107,10 @@ class MainActivity : AppCompatActivity() {
                             channelsMap[channelNum] = channelName
                         }
                     }
-                    Log.d("VIA_Index", "Successfully parsed index.txt!")
+                    Timber.d("VIA_Index: Successfully parsed index.txt!")
                 } else {
-                    Log.e(
-                        "VIA_Index",
-                        "Failed to download index.txt: HTTP ${indexResponse.code()} - ${
+                    Timber.e(
+                        "VIA_Index: Failed to download index.txt: HTTP ${indexResponse.code()} - ${
                             indexResponse.errorBody()?.string()
                         }"
                     )
@@ -1138,7 +1118,7 @@ class MainActivity : AppCompatActivity() {
 
                 // Log the channelMap
                 channelsMap.forEach { (key, value) ->
-                    Log.i("VIA_Index", "Key: $key, Value: $value")
+                    Timber.i("VIA_Index: Key: $key, Value: $value")
                 }
 
                 // Scan the main folder for the MP3s
@@ -1198,9 +1178,8 @@ class MainActivity : AppCompatActivity() {
 
                 // Calculates the difference between what we have in memory and what we currently have
                 val newFilesCount = audioQueue.size - lastKnownCount
-                Log.i(
-                    "VIA_System",
-                    "Library synced. Total files: ${audioQueue.size}. Delta since last check: $newFilesCount"
+                Timber.i(
+                    "VIA_System: Library synced. Total files: ${audioQueue.size}. Delta since last check: $newFilesCount"
                 )
 
                 // // Checks if the folder size is bigger than what we have stored in "prefs"
@@ -1208,9 +1187,8 @@ class MainActivity : AppCompatActivity() {
 
                     // Kinda of a shitty solution for preventing the daily tips from overriding the "new files" tts, but eh, idc...
                     while (isVoiceBusy) {
-                        Log.d(
-                            "VIA_TTS",
-                            "Waiting for Daily Tip to finish before announcing new files..."
+                        Timber.d(
+                            "VIA_TTS: Waiting for Daily Tip to finish before announcing new files..."
                         )
                         kotlinx.coroutines.delay(1500) // Sleeps for a second and a half, then checks again
                     }
@@ -1229,7 +1207,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         speak("אין קבצים חדשים")
                     } else {
-                        Log.d("VIA_System", "Silent sync found no new files. Remaining quiet.")
+                        Timber.d("VIA_System: Silent sync found no new files. Remaining quiet.")
                     }
                 }
 
@@ -1237,7 +1215,7 @@ class MainActivity : AppCompatActivity() {
                 prefs.edit { putInt("last_known_count", audioQueue.size) }
 
             } catch (e: Exception) {
-                Log.e("VIA_Dropbox", "Library refresh completely failed: ${e.message}")
+                Timber.e("VIA_Dropbox: Library refresh completely failed: ${e.message}")
             } finally {
                 // Guaranteed to run and "open the door" back up when everything finishes
                 isRefreshing = false
@@ -1250,10 +1228,10 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             if (keepAwake) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                Log.d("VIA_Screen", "Screen WakeLock forced AWAKE")
+                Timber.d("VIA_Screen: Screen WakeLock forced AWAKE")
             } else {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                Log.d("VIA_Screen", "Screen WakeLock allowed to SLEEP")
+                Timber.d("VIA_Screen: Screen WakeLock allowed to SLEEP")
             }
         }
     }
@@ -1262,7 +1240,7 @@ class MainActivity : AppCompatActivity() {
     private fun syncHeardStatusToDropbox(audioPath: String) {
         lifecycleScope.launch {
             try {
-                Log.d("VIA_Sync", "Attempting to create marker file on Dropbox for: $audioPath")
+                Timber.d("VIA_Sync: Attempting to create marker file on Dropbox for: $audioPath")
                 // Dropbox uses the 'content' subdomain for uploads
                 val apiService = Retrofit.Builder()
                     .baseUrl("https://content.dropboxapi.com/")
@@ -1300,16 +1278,15 @@ class MainActivity : AppCompatActivity() {
                 val response = apiService.uploadFile(token, safeJson, emptyBody)
 
                 if (response.isSuccessful) {
-                    Log.i("VIA_Sync", "SUCCESS: Marker file successfully uploaded at $markerPath")
+                    Timber.i("VIA_Sync: SUCCESS: Marker file successfully uploaded at $markerPath")
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    Log.e(
-                        "VIA_Sync",
-                        "Dropbox Rejected Marker Upload: HTTP ${response.code()} - $errorBody"
+                    Timber.e(
+                        "VIA_Sync: Dropbox Rejected Marker Upload: HTTP ${response.code()} - $errorBody"
                     )
                 }
             } catch (e: Exception) {
-                Log.e("VIA_Sync", "Sync Connection Error while uploading marker: ${e.message}")
+                Timber.e("VIA_Sync: Sync Connection Error while uploading marker: ${e.message}")
             }
         }
     }
@@ -1318,7 +1295,7 @@ class MainActivity : AppCompatActivity() {
     private fun unsyncHeardStatusToDropbox(audioPath: String) {
         lifecycleScope.launch {
             try {
-                Log.d("VIA_Sync", "Attempting to delete marker file on Dropbox for: $audioPath")
+                Timber.d("VIA_Sync: Attempting to delete marker file on Dropbox for: $audioPath")
                 // Dropbox uses the standard 'api' subdomain for metadata and file management operations
                 val apiService = Retrofit.Builder()
                     .baseUrl("https://api.dropboxapi.com/")
@@ -1341,16 +1318,15 @@ class MainActivity : AppCompatActivity() {
                 val response = apiService.deleteFile(token = token, body = deleteMap)
 
                 if (response.isSuccessful) {
-                    Log.i("VIA_Sync", "SUCCESS: Marker file successfully removed at $markerPath")
+                    Timber.i("VIA_Sync: SUCCESS: Marker file successfully removed at $markerPath")
                 } else {
                     val errorBody = response.errorBody()?.string()
-                    Log.e(
-                        "VIA_Sync",
-                        "Dropbox Rejected Marker Delete: HTTP ${response.code()} - $errorBody"
+                    Timber.e(
+                        "VIA_Sync: Dropbox Rejected Marker Delete: HTTP ${response.code()} - $errorBody"
                     )
                 }
             } catch (e: Exception) {
-                Log.e("VIA_Sync", "Sync Connection Error while deleting marker: ${e.message}")
+                Timber.e("VIA_Sync: Sync Connection Error while deleting marker: ${e.message}")
             }
         }
     }
@@ -1367,9 +1343,8 @@ class MainActivity : AppCompatActivity() {
         val lastPlayedDate = prefs.getString("last_instruction_date", "")
 
         if (logicalToday != lastPlayedDate) {
-            Log.i(
-                "VIA_Instructions",
-                "New logical day detected ($logicalToday). Triggering daily instruction tip."
+            Timber.i(
+                "VIA_Instructions: New logical day detected ($logicalToday). Triggering daily instruction tip."
             )
 
             // List of all possible "tips"
@@ -1395,9 +1370,8 @@ class MainActivity : AppCompatActivity() {
                 putString("last_instruction_date", logicalToday)
             }
         } else {
-            Log.d(
-                "VIA_Instructions",
-                "Daily tip skipped. Already played for logical day: $logicalToday"
+            Timber.d(
+                "VIA_Instructions: Daily tip skipped. Already played for logical day: $logicalToday"
             )
         }
     }
@@ -1430,7 +1404,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 // Once connected, assign the finished controller to our global variable
                 mediaController = controllerFuture?.get()
-                Log.d("VIA_System", "MediaController successfully bound to PlaybackService.")
+                Timber.d("VIA_System: MediaController successfully bound to PlaybackService.")
 
                 // Get the audioPrefs
                 val audioPrefs = getSharedPreferences("AudioPrefs", MODE_PRIVATE)
@@ -1442,7 +1416,7 @@ class MainActivity : AppCompatActivity() {
                 val playbackParameters = PlaybackParameters(actualExoPlayerSpeed, 1.0f)
                 mediaController?.playbackParameters = playbackParameters
 
-                Log.d("VIA_System", "Booted ExoPlayer with saved speed: $actualExoPlayerSpeed")
+                Timber.d("VIA_System: Booted ExoPlayer with saved speed: $actualExoPlayerSpeed")
 
                 // TODO: Add an update for the tts speed
 
@@ -1450,9 +1424,8 @@ class MainActivity : AppCompatActivity() {
                 // Attaches the listener to the controller
                 mediaController?.addListener(object : Player.Listener {
                     override fun onPlayerError(error: PlaybackException) {
-                        Log.e(
-                            "VIA_Audio",
-                            "ExoPlayer error: ${error.errorCodeName} - ${error.message}"
+                        Timber.e(
+                            "VIA_Audio: ExoPlayer error: ${error.errorCodeName} - ${error.message}"
                         )
 
                         // Catches expired Dropbox links, dropped Wi-Fi,
@@ -1463,7 +1436,7 @@ class MainActivity : AppCompatActivity() {
                             error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
                         ) {
 
-                            Log.w("VIA_Audio", "Stream starved. Auto-recovering...")
+                            Timber.w("VIA_Audio: Stream starved. Auto-recovering...")
 
                             // Pauses to safely write the exact crash timestamp to SharedPreferences
                             pauseAudio()
@@ -1477,10 +1450,10 @@ class MainActivity : AppCompatActivity() {
 
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_READY) {
-                            Log.d("VIA_Audio", "Playback READY and streaming successfully.")
+                            Timber.d("VIA_Audio: Playback READY and streaming successfully.")
                             progressJob?.cancel()
                             progressJob = lifecycleScope.launch {
-                                Log.d("VIA_System", "Background progress tracker started.")
+                                Timber.d("VIA_System: Background progress tracker started.")
                                 // Loops while the controller exists and is playing
                                 while (mediaController != null) {
                                     val player = mediaController ?: break
@@ -1503,10 +1476,7 @@ class MainActivity : AppCompatActivity() {
                                                     )
                                                 }
                                                 syncHeardStatusToDropbox(currentPath)
-                                                Log.i(
-                                                    "VIA_Audio",
-                                                    "Auto-marked track as HEARD at 92% completion."
-                                                )
+                                                Timber.i("%s", "VIA_Audio: Auto-marked track as HEARD at 92% completion.")
                                             }
                                         }
 
@@ -1524,10 +1494,7 @@ class MainActivity : AppCompatActivity() {
                                                     )
                                                 }
                                                 syncHeardStatusToDropbox(currentPath)
-                                                Log.i(
-                                                    "VIA_Audio",
-                                                    "Auto-marked track as HEARD at 95% completion."
-                                                )
+                                                Timber.i("%s", "VIA_Audio: Auto-marked track as HEARD at 95% completion.")
                                             }
                                         }
 
@@ -1545,10 +1512,7 @@ class MainActivity : AppCompatActivity() {
                                                     )
                                                 }
                                                 syncHeardStatusToDropbox(currentPath)
-                                                Log.i(
-                                                    "VIA_Audio",
-                                                    "Auto-marked track as HEARD at 98% completion."
-                                                )
+                                                Timber.i("%s", "VIA_Audio: Auto-marked track as HEARD at 98% completion.")
                                             }
                                         }
                                     }
@@ -1604,7 +1568,7 @@ class MainActivity : AppCompatActivity() {
                 })
 
             } catch (e: Exception) {
-                Log.e("VIA_System", "Failed to bind MediaController: ${e.message}")
+                Timber.e("VIA_System: Failed to bind MediaController: ${e.message}")
             }
         }, ContextCompat.getMainExecutor(this)) // Forces the result onto the Main UI Thread
     }
@@ -1612,7 +1576,7 @@ class MainActivity : AppCompatActivity() {
     // Performs a silent library refresh when the app is brought back to the screen
     override fun onResume() {
         super.onResume()
-        Log.d("VIA_System", "onResume triggered. App brought to foreground.")
+        Timber.d("VIA_System: onResume triggered. App brought to foreground.")
 
         // Check the clock here. This ensures it runs even if the app was just minimized.
         checkAndPlayDailyInstructions()
@@ -1632,7 +1596,7 @@ class MainActivity : AppCompatActivity() {
     // Function that gets triggered automatically by Android the
 // exact moment the app is completely hidden from the user's screen.
     override fun onStop() {
-        Log.d("VIA_System", "onStop triggered. App sent to background.")
+        Timber.d("VIA_System: onStop triggered. App sent to background.")
 
         // Let's go of the remote control so the Service can keep running in the background
         controllerFuture?.let { future ->
@@ -1661,10 +1625,10 @@ object DropboxAuth {
                 clientSecret = BuildConfig.DROPBOX_CLIENT_SECRET
             )
             cachedToken = response.accessToken
-            Log.d("VIA_Auth", "Access token successfully refreshed via Dropbox API")
+            Timber.d("VIA_Auth: Access token successfully refreshed via Dropbox API")
             "Bearer $cachedToken"
         } catch (e: Exception) {
-            Log.e("VIA_Auth", "CRITICAL: Token refresh failed: ${e.message}")
+            Timber.e("VIA_Auth: CRITICAL: Token refresh failed: ${e.message}")
             ""
         }
     }

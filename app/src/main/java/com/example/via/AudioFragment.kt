@@ -2,7 +2,6 @@ package com.example.via
 
 import android.content.Context
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,10 +10,10 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.shawnlin.numberpicker.NumberPicker
+import timber.log.Timber
 
 class AudioFragment : Fragment() {
 
-    private val TAG = "AudioFragment"
 
     // Opens the app's private save file ("AudioPrefs") to remember speed settings
     private val prefs by lazy {
@@ -76,7 +75,7 @@ class AudioFragment : Fragment() {
         exoPlayerNumberPicker.setOnClickListener {
             val selectedIndex = exoPlayerNumberPicker.value
             actualExoPlayerSpeed = speedOptions[selectedIndex].toFloat()
-            Log.d(TAG, String.format(java.util.Locale.US, "User tapped on speed: %.2f", actualExoPlayerSpeed))
+            Timber.d(String.format(java.util.Locale.US, "User tapped on speed: %.2f", actualExoPlayerSpeed))
         }
 
         /**
@@ -85,7 +84,7 @@ class AudioFragment : Fragment() {
         exoPlayerNumberPicker.setOnValueChangedListener(object : NumberPicker.OnValueChangeListener {
             override fun onValueChange(picker: NumberPicker?, oldVal: Int, newVal: Int) {
                 actualExoPlayerSpeed = speedOptions[newVal].toFloat()
-                Log.d(TAG, String.format(java.util.Locale.US, "Speed changed to: %.2f", actualExoPlayerSpeed))
+                Timber.d(String.format(java.util.Locale.US, "Speed changed to: %.2f", actualExoPlayerSpeed))
             }
         })
 
@@ -96,7 +95,7 @@ class AudioFragment : Fragment() {
             override fun onScrollStateChange(picker: NumberPicker, scrollState: Int) {
                 if (scrollState == NumberPicker.OnScrollListener.SCROLL_STATE_IDLE) {
                     actualExoPlayerSpeed = speedOptions[picker.value].toFloat()
-                    Log.d(TAG, String.format(java.util.Locale.US, "Scroll idle at speed: %.2f", actualExoPlayerSpeed))
+                    Timber.d(String.format(java.util.Locale.US, "Scroll idle at speed: %.2f", actualExoPlayerSpeed))
                 }
             }
         })
@@ -117,10 +116,10 @@ class AudioFragment : Fragment() {
             // Check if it saved correctly
             if (isSaved) {
                 Toast.makeText(context, "Saved!", Toast.LENGTH_SHORT).show()
-                Log.d(TAG, "Speed applied and saved to SharedPreferences")
+                Timber.d("Speed applied and saved to SharedPreferences")
             } else {
                 Toast.makeText(context, "Failed to save!", Toast.LENGTH_SHORT).show()
-                Log.e(TAG, "ERROR: Failed to save speed to SharedPreferences.")
+                Timber.e("ERROR: Failed to save speed to SharedPreferences.")
             }
         }
     }

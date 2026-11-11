@@ -133,6 +133,9 @@ dependencies {
     // Sliding number picker
     implementation("io.github.ShawnLin013:number-picker:2.4.13")
 
+    // Timber
+    implementation("com.jakewharton.timber:timber:5.0.1")
+
     implementation("androidx.media3:media3-session:1.9.2")
     implementation("androidx.media3:media3-exoplayer:1.9.2") // media player shit
     implementation("androidx.media3:media3-ui:1.9.2") // media player shit

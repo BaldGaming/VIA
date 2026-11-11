@@ -1,10 +1,11 @@
 package com.example.via
 
 // --- CORE ANDROID & UI ---
+
+// --- ASYNC & COROUTINES (BACKGROUND WORKERS) ---
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.style.UnderlineSpan
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -15,11 +16,10 @@ import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-
-// --- ASYNC & COROUTINES (BACKGROUND WORKERS) ---
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 class DevFragment : Fragment() {
 
@@ -57,7 +57,7 @@ class DevFragment : Fragment() {
         // Listens for any time a sub-fragment is swiped away or popped
         childFragmentManager.addOnBackStackChangedListener {
             if (childFragmentManager.backStackEntryCount == 0) {
-                Log.d("VIA_Admin", "Sub-fragment closed. Returning to dashboard.")
+                Timber.d("VIA_Admin: Sub-fragment closed. Returning to dashboard.")
                 subFragmentContainer.visibility = View.GONE
             }
         }
@@ -71,16 +71,16 @@ class DevFragment : Fragment() {
 
                     if (devContainer?.visibility == View.VISIBLE) {
                         if (childFragmentManager.backStackEntryCount > 0) {
-                            Log.d("VIA_Admin", "Back swipe intercepted: Popping sub-fragment.")
+                            Timber.d("VIA_Admin: Back swipe intercepted: Popping sub-fragment.")
                             childFragmentManager.popBackStack()
                         } else {
-                            Log.d("VIA_Admin", "Back swipe intercepted: Closing Admin dashboard.")
+                            Timber.d("VIA_Admin: Back swipe intercepted: Closing Admin dashboard.")
                             devContainer.visibility = View.GONE
                             countdownJob?.cancel()
 
                             val mainActivity = activity as? MainActivity
                             if (mainActivity?.isVoiceBusy == true && toolbar.visibility != View.VISIBLE) {
-                                Log.d("VIA_TTS", "User exited during warning TTS. Triggering gag.")
+                                Timber.d("VIA_TTS: User exited during warning TTS. Triggering gag.")
                                 mainActivity.speak("לא יפה, תיתן לי לסיים לדבר.")
                             }
                         }
@@ -131,7 +131,7 @@ class DevFragment : Fragment() {
          * Stay logic
          */
         stayBtn.setOnClickListener {
-            Log.d("VIA_Button", "Admin stay button tapped")
+            Timber.d("VIA_Button: Admin stay button tapped")
             stay = true
             stayBtn.visibility = View.INVISIBLE
         }
@@ -140,7 +140,7 @@ class DevFragment : Fragment() {
          * Log button
          */
         logBtn.setOnClickListener {
-            Log.d("VIA_Button", "Admin module opened: Logs")
+            Timber.d("VIA_Button: Admin module opened: Logs")
             childFragmentManager.beginTransaction()
                 .replace(R.id.dev_sub_fragment_container, LogsFragment())
                 .setReorderingAllowed(true)
@@ -154,7 +154,7 @@ class DevFragment : Fragment() {
          * Info 1 logic
          */
         infoBtn1.setOnClickListener {
-            Log.d("VIA_Button", "Info 1 button pressed.")
+            Timber.d("VIA_Button: Info 1 button pressed.")
 
             // Build the unformatted body text
             val bodyText =
@@ -171,7 +171,7 @@ class DevFragment : Fragment() {
          * Audio button
          */
         audioBtn.setOnClickListener {
-            Log.d("VIA_Button", "Admin module opened: Audio")
+            Timber.d("VIA_Button: Admin module opened: Audio")
             childFragmentManager.beginTransaction()
                 .replace(R.id.dev_sub_fragment_container, AudioFragment())
                 .setReorderingAllowed(true)
@@ -185,7 +185,7 @@ class DevFragment : Fragment() {
          * Info 2 logic
          */
         infoBtn2.setOnClickListener {
-            Log.d("VIA_Button", "Info 2 button pressed.")
+            Timber.d("VIA_Button: Info 2 button pressed.")
 
             val bodyText =
                 "In here you'll be able to control:\n\n" +
@@ -204,7 +204,7 @@ class DevFragment : Fragment() {
          * File Management button
          */
         fileManagementBtn.setOnClickListener {
-            Log.d("VIA_Button", "Admin module opened: File Management")
+            Timber.d("VIA_Button: Admin module opened: File Management")
             childFragmentManager.beginTransaction()
                 .replace(R.id.dev_sub_fragment_container, FileManagementFragment())
                 .setReorderingAllowed(true)
@@ -218,7 +218,7 @@ class DevFragment : Fragment() {
          * Info 3 logic
          */
         infoBtn3.setOnClickListener {
-            Log.d("VIA_Button", "Info 3 button pressed.")
+            Timber.d("VIA_Button: Info 3 button pressed.")
             val bodyText =
                 "In here you'll be able to manually mark and unmark files as heard."
 
@@ -234,7 +234,7 @@ class DevFragment : Fragment() {
          * File Marking button
          */
         fileMarkingBtn.setOnClickListener {
-            Log.d("VIA_Button", "Admin module opened: File Marking")
+            Timber.d("VIA_Button: Admin module opened: File Marking")
             childFragmentManager.beginTransaction()
                 .replace(R.id.dev_sub_fragment_container, FileMarkingFragment())
                 .setReorderingAllowed(true)
@@ -248,7 +248,7 @@ class DevFragment : Fragment() {
          * Info 4 logic
          */
         infoBtn4.setOnClickListener {
-            Log.d("VIA_Button", "Info 4 button pressed.")
+            Timber.d("VIA_Button: Info 4 button pressed.")
             val bodyText =
                 "In here you'll be able to:\n\n" +
                         "1. Delete files\n" +
@@ -266,7 +266,7 @@ class DevFragment : Fragment() {
          * Offline button
          */
         offlineBtn.setOnClickListener {
-            Log.d("VIA_Button", "Admin module opened: Offline Mode")
+            Timber.d("VIA_Button: Admin module opened: Offline Mode")
             childFragmentManager.beginTransaction()
                 .replace(R.id.dev_sub_fragment_container, OfflineFragment())
                 .setReorderingAllowed(true)
@@ -280,7 +280,7 @@ class DevFragment : Fragment() {
          * Info 5 logic
          */
         infoBtn5.setOnClickListener {
-            Log.d("VIA_Button", "Info 5 button pressed.")
+            Timber.d("VIA_Button: Info 5 button pressed.")
             val bodyText =
                 "עדיין אין לי ממש מושג זה אמור לעשות..\nנגלה בעתיד :^)"
 
@@ -296,7 +296,7 @@ class DevFragment : Fragment() {
          * Statistics button
          */
         statisticsBtn.setOnClickListener {
-            Log.d("VIA_Button", "Admin module opened: Statistics")
+            Timber.d("VIA_Button: Admin module opened: Statistics")
             childFragmentManager.beginTransaction()
                 .replace(R.id.dev_sub_fragment_container, StatisticsFragment())
                 .setReorderingAllowed(true)
@@ -310,7 +310,7 @@ class DevFragment : Fragment() {
          * Info 6 logic
          */
         infoBtn6.setOnClickListener {
-            Log.d("VIA_Button", "Info 6 button pressed.")
+            Timber.d("VIA_Button: Info 6 button pressed.")
             val bodyText =
                 "In here you'll be able to view:\n\n" +
                         "1. Stats about \"הפעלת קול\", whatever that means\n" +
@@ -332,7 +332,7 @@ class DevFragment : Fragment() {
         randomizeStayCords()
         countdownJob?.cancel()
 
-        Log.d("VIA_Admin", "Timeout sequence started. Awaiting user verification.")
+        Timber.d("VIA_Admin: Timeout sequence started. Awaiting user verification.")
 
         countdownJob = viewLifecycleOwner.lifecycleScope.launch {
             while (mainActivity.isVoiceBusy) {
@@ -355,14 +355,14 @@ class DevFragment : Fragment() {
             if (!isAdded) return@launch
 
             if (stay) {
-                Log.d("VIA_Admin", "User successfully verified. Revealing dashboard.")
+                Timber.d("VIA_Admin: User successfully verified. Revealing dashboard.")
                 stayBtn.visibility = View.INVISIBLE
                 toolbar.visibility = View.VISIBLE
                 paginationLayout.visibility = View.VISIBLE
                 buttonGrid.visibility = View.VISIBLE
                 mainActivity.speak(mainActivity.stayMessage)
             } else {
-                Log.d("VIA_Admin", "User failed to verify in time. Booting back to main screen.")
+                Timber.d("VIA_Admin: User failed to verify in time. Booting back to main screen.")
                 stayBtn.visibility = View.INVISIBLE
                 mainActivity.speak(mainActivity.backMessage)
                 activity?.findViewById<View>(R.id.fragment_dev)?.visibility = View.GONE
@@ -392,7 +392,7 @@ class DevFragment : Fragment() {
             stayBtn.y = randomY.toFloat()
 
             stayBtn.visibility = View.VISIBLE
-            Log.d("VIA_Admin", "Randomized verification button coordinates.")
+            Timber.d("VIA_Admin: Randomized verification button coordinates.")
         }
     }
 
