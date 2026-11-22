@@ -28,12 +28,21 @@ class FileLoggingTree(private val context: Context) : Timber.Tree() {
         }
 
         // Build the string we want to save to a file
-        val finalLogLine = "[$timestamp] [$priorityString] $tag: $message\n"
+        val finalLogLine = "[$timestamp] [$priorityString] $tag:$message\n"
 
-        // Get the file we want to write to
-        val logFile = File(context.filesDir, "app_logs.txt")
+        try {
+            // Get the file we want to write to
+            val logFile = File(context.filesDir, "app_logs.txt")
 
-        // This line opens the stream, converts the string into bytes, appends it and finally closes.
-        logFile.appendText(finalLogLine)
+            // Reset the log file if it exceeds 2MB so it never grows infinitely
+            if (logFile.exists() && logFile.length() > 2_000_000) {
+                logFile.delete()
+            }
+
+            // This line opens the stream, converts the string into bytes, appends it and finally closes.
+            logFile.appendText(finalLogLine)
+        } catch (_: Exception) {
+            // Prevents file I/O issues from crashing the app mid-log
+        }
     }
 }

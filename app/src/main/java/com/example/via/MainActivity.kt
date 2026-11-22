@@ -50,6 +50,7 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import retrofit2.Retrofit
@@ -60,6 +61,7 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 // Song data class
 data class AudioFile(val title: String, val path: String)
@@ -81,8 +83,11 @@ class MainActivity : AppCompatActivity() {
     var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? =
         null // Tracks the connection to the background service
+    private var pendingPlaybackAfterReconnect = false
     private lateinit var prefs: SharedPreferences
     private lateinit var apiService: ApiService
+    private lateinit var contentApiService: ApiService
+    private lateinit var azureApiService: ApiService
 
     // The current queue
     private var audioQueue = mutableListOf<AudioFile>()
@@ -161,6 +166,7 @@ class MainActivity : AppCompatActivity() {
 
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
+                        isVoiceBusy = false
                         keepScreenAwake(false)
                     }
                 })
@@ -221,14 +227,36 @@ class MainActivity : AppCompatActivity() {
         // A unique tag for identification
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VIA::WakeLockTag")
 
-        // Builder for RetroFit (the tool that talks to the Dropbox API)
-        val retrofit = Retrofit.Builder()
-            .baseUrl("https://api.dropboxapi.com/") // The API endpoint
-            .addConverterFactory(GsonConverterFactory.create())
+        // Single shared OkHttpClient so connections and thread pools are reused cleanly
+        val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .build()
 
-        // API instance
-        apiService = retrofit.create(ApiService::class.java)
+        // Builder for RetroFit (the tool that talks to the Dropbox API)
+        apiService = Retrofit.Builder()
+            .baseUrl("https://api.dropboxapi.com/") // The API endpoint
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApiService::class.java)
+
+        // Dropbox content endpoint (index.txt downloads and .h marker uploads)
+        contentApiService = Retrofit.Builder()
+            .baseUrl("https://content.dropboxapi.com/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApiService::class.java)
+
+        // Azure TTS endpoint
+        azureApiService = Retrofit.Builder()
+            .baseUrl("https://${BuildConfig.AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/")
+            .client(okHttpClient)
+            .build()
+            .create(ApiService::class.java)
 
         // Tell Android what kind of audio this is
         val audioAttributes = AudioAttributes.Builder()
@@ -262,6 +290,7 @@ class MainActivity : AppCompatActivity() {
             voicePlayer?.release()
             voicePlayer = null
             fallbackTts?.stop()
+            isVoiceBusy = false
 
             // Waits until playlist is downloaded
             if (audioQueue.isEmpty()) {
@@ -273,14 +302,22 @@ class MainActivity : AppCompatActivity() {
             // Gets the current media player instance
             val currentPlayer = mediaController
 
+            // If OS killed PlaybackService while idle, reconnect and auto-start playback
+            if (currentPlayer == null || !currentPlayer.isConnected) {
+                Timber.w("VIA_Audio: MediaController disconnected on Play tap. Reconnecting...")
+                pendingPlaybackAfterReconnect = true
+                connectMediaController()
+                return@setOnClickListener
+            }
+
             // Pauses the player and saves position if already playing
-            if (currentPlayer != null && currentPlayer.isPlaying) {
+            if (currentPlayer.isPlaying) {
                 pauseAudio()
                 Timber.d("VIA_Audio: Audio paused manually")
             }
 
             // Checks if a song is loaded and verifies it matches the current UI index
-            else if (currentPlayer != null && currentPlayer.currentMediaItem != null && loadedAudioIndex == currentAudioIndex) {
+            else if (currentPlayer.currentMediaItem != null && loadedAudioIndex == currentAudioIndex) {
                 currentPlayer.play()
 
                 // Starts wakeLock with a 4-hour timeout (14400000ms) to save battery if forgotten
@@ -309,9 +346,10 @@ class MainActivity : AppCompatActivity() {
             voicePlayer?.release()
             voicePlayer = null
             fallbackTts?.stop()
+            isVoiceBusy = false
 
             // Toggles the heard status of the current file
-            if (audioQueue.isNotEmpty()) {
+            if (audioQueue.isNotEmpty() && currentAudioIndex in audioQueue.indices) {
                 val currentPath = audioQueue[currentAudioIndex].path
                 val isCurrentlyHeard = prefs.getBoolean("heard_$currentPath", false)
                 val newHeardState = !isCurrentlyHeard
@@ -434,9 +472,11 @@ class MainActivity : AppCompatActivity() {
                     player.seekTo(0)
 
                     // Updates the SharedPreferences to reflect this reset
-                    val audioPath = audioQueue[currentAudioIndex].path
-                    prefs.edit { putInt("last_pos_$audioPath", 0) }
-                    Timber.d("VIA_Audio: Track position reset to 0 for: $audioPath")
+                    if (currentAudioIndex in audioQueue.indices) {
+                        val audioPath = audioQueue[currentAudioIndex].path
+                        prefs.edit { putInt("last_pos_$audioPath", 0) }
+                        Timber.d("VIA_Audio: Track position reset to 0 for: $audioPath")
+                    }
                 }
                 speak("חזרתא לתחילת הקובץ.")
                 true
@@ -674,7 +714,7 @@ class MainActivity : AppCompatActivity() {
 
     // Function that reads the title and appends the heard status
     private fun readCurrentTitle(onComplete: (() -> Unit)? = null) {
-        if (audioQueue.isEmpty()) {
+        if (audioQueue.isEmpty() || currentAudioIndex !in audioQueue.indices) {
             speak("רשימת הקבצים ריקה")
             return
         }
@@ -804,12 +844,6 @@ class MainActivity : AppCompatActivity() {
 
         Timber.i("VIA_TTS: Monthly Azure Characters Used: $newCount / 500000")
 
-        // Creates a separate Retrofit instance for the Azure endpoint
-        val azureRetrofit = Retrofit.Builder()
-            .baseUrl("https://${BuildConfig.AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/")
-            .build()
-            .create(ApiService::class.java)
-
         // Formats the SSML request
         val ssmlText = """
             <speak version='1.0' xml:lang='he-IL'>
@@ -828,7 +862,7 @@ class MainActivity : AppCompatActivity() {
         // Starts a tracked coroutine for the API call
         ttsJob = lifecycleScope.launch {
             try {
-                val response = azureRetrofit.getAzureTTS(
+                val response = azureApiService.getAzureTTS(
                     apiKey = BuildConfig.AZURE_TTS_KEY,
                     ssml = requestBody
                 )
@@ -875,6 +909,12 @@ class MainActivity : AppCompatActivity() {
                     findViewById<Button>(R.id.button1).performClick() // Clicks play
                 }
             }
+            setOnErrorListener { _, what, extra ->
+                Timber.e("VIA_TTS: MediaPlayer error ($what, $extra)")
+                isVoiceBusy = false
+                keepScreenAwake(false)
+                true
+            }
             prepare()
             keepScreenAwake(true)
             start()
@@ -907,11 +947,6 @@ class MainActivity : AppCompatActivity() {
 
         Timber.i("VIA_TTS: Monthly Azure Characters Used: $newCount / 500000 (Prefetch)")
 
-        val azureRetrofit = Retrofit.Builder()
-            .baseUrl("https://${BuildConfig.AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/")
-            .build()
-            .create(ApiService::class.java)
-
         val ssmlText = """
             <speak version='1.0' xml:lang='he-IL'>
                 <voice xml:lang='he-IL' xml:gender='Male' name='he-IL-AvriNeural'>
@@ -927,7 +962,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val response =
-                    azureRetrofit.getAzureTTS(BuildConfig.AZURE_TTS_KEY, ssml = requestBody)
+                    azureApiService.getAzureTTS(BuildConfig.AZURE_TTS_KEY, ssml = requestBody)
                 if (response.isSuccessful) {
                     response.body()?.bytes()?.let { audioBytes ->
                         FileOutputStream(cachedVoiceFile).use { it.write(audioBytes) }
@@ -973,6 +1008,8 @@ class MainActivity : AppCompatActivity() {
 
     // Function that handles playing audio via the background service.
     private fun playAudio(url: String) {
+        if (audioQueue.isEmpty() || currentAudioIndex !in audioQueue.indices) return
+
         val mediaItem = MediaItem.fromUri(url)
 
         mediaController?.let { controller ->
@@ -996,6 +1033,8 @@ class MainActivity : AppCompatActivity() {
 
     // Function that handles pausing audio.
     private fun pauseAudio() {
+        if (audioQueue.isEmpty() || currentAudioIndex !in audioQueue.indices) return
+
         mediaController?.let { player ->
             val audioPath = audioQueue[currentAudioIndex].path // Gets the audio path
             val rawPosition = player.currentPosition // Gets the current position
@@ -1030,6 +1069,8 @@ class MainActivity : AppCompatActivity() {
     private fun startPlaybackWorkflow() {
         lifecycleScope.launch {
             try {
+                if (audioQueue.isEmpty() || currentAudioIndex !in audioQueue.indices) return@launch
+
                 // Validates the token before fetching the link
                 val token = DropboxAuth.getValidToken(apiService)
                 if (token.isEmpty()) return@launch
@@ -1044,6 +1085,9 @@ class MainActivity : AppCompatActivity() {
                 Timber.i("VIA_Dropbox: Streaming link fetched successfully.")
                 playAudio(linkResponse.link) // Now we play the valid link
             } catch (e: Exception) {
+                if (e is retrofit2.HttpException && e.code() == 401) {
+                    DropboxAuth.invalidateToken()
+                }
                 Timber.e("VIA_Dropbox: Failed to fetch streaming link: ${e.message}")
                 speak("שגיאה בהפעלת הקובץ")
             }
@@ -1068,13 +1112,6 @@ class MainActivity : AppCompatActivity() {
                 // Validates the token before scanning the folder
                 val token = DropboxAuth.getValidToken(apiService)
                 if (token.isEmpty()) return@launch
-
-                // Create a special Retrofit instance just for downloading content
-                val contentApiService = Retrofit.Builder()
-                    .baseUrl("https://content.dropboxapi.com/")
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build()
-                    .create(ApiService::class.java)
 
                 // Pass a min JSON object to DropBox then receive the text into "indexResponse".
                 val indexArgs = """{"path": "/via_audio/index.txt"}"""
@@ -1158,6 +1195,13 @@ class MainActivity : AppCompatActivity() {
                     }
                 })
 
+                // Keeps currentAudioIndex safely within bounds if queue size changed
+                currentAudioIndex = if (audioQueue.isNotEmpty()) {
+                    currentAudioIndex.coerceIn(0, audioQueue.size - 1)
+                } else {
+                    0
+                }
+
                 // Dynamically extract only the channels that actually exist to save Azure API calls
                 val availableChannels = audioQueue.map { file ->
                     val num = Regex("\\d+").find(file.title)?.value?.toLong() ?: 0L
@@ -1186,11 +1230,13 @@ class MainActivity : AppCompatActivity() {
                 if (newFilesCount > 0) {
 
                     // Kinda of a shitty solution for preventing the daily tips from overriding the "new files" tts, but eh, idc...
-                    while (isVoiceBusy) {
+                    var waitedMs = 0
+                    while (isVoiceBusy && waitedMs < 15000) {
                         Timber.d(
                             "VIA_TTS: Waiting for Daily Tip to finish before announcing new files..."
                         )
                         kotlinx.coroutines.delay(1500) // Sleeps for a second and a half, then checks again
+                        waitedMs += 1500
                     }
 
                     // Once the loop breaks (isVoiceBusy becomes false), announce the files
@@ -1202,8 +1248,10 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     // Only tell them they are up to date if they specifically asked
                     if (isManualRefresh) {
-                        while (isVoiceBusy) {
+                        var waitedMs = 0
+                        while (isVoiceBusy && waitedMs < 15000) {
                             kotlinx.coroutines.delay(500)
+                            waitedMs += 500
                         }
                         speak("אין קבצים חדשים")
                     } else {
@@ -1215,6 +1263,9 @@ class MainActivity : AppCompatActivity() {
                 prefs.edit { putInt("last_known_count", audioQueue.size) }
 
             } catch (e: Exception) {
+                if (e is retrofit2.HttpException && e.code() == 401) {
+                    DropboxAuth.invalidateToken()
+                }
                 Timber.e("VIA_Dropbox: Library refresh completely failed: ${e.message}")
             } finally {
                 // Guaranteed to run and "open the door" back up when everything finishes
@@ -1241,12 +1292,6 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 Timber.d("VIA_Sync: Attempting to create marker file on Dropbox for: $audioPath")
-                // Dropbox uses the 'content' subdomain for uploads
-                val apiService = Retrofit.Builder()
-                    .baseUrl("https://content.dropboxapi.com/")
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build()
-                    .create(ApiService::class.java)
 
                 val token = DropboxAuth.getValidToken(apiService)
                 if (token.isEmpty()) return@launch
@@ -1275,11 +1320,14 @@ class MainActivity : AppCompatActivity() {
                 val emptyBody = "".toRequestBody("application/octet-stream".toMediaType())
 
                 // Sends the request to the correct content.dropboxapi.com domain
-                val response = apiService.uploadFile(token, safeJson, emptyBody)
+                val response = contentApiService.uploadFile(token, safeJson, emptyBody)
 
                 if (response.isSuccessful) {
                     Timber.i("VIA_Sync: SUCCESS: Marker file successfully uploaded at $markerPath")
                 } else {
+                    if (response.code() == 401) {
+                        DropboxAuth.invalidateToken()
+                    }
                     val errorBody = response.errorBody()?.string()
                     Timber.e(
                         "VIA_Sync: Dropbox Rejected Marker Upload: HTTP ${response.code()} - $errorBody"
@@ -1296,12 +1344,6 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 Timber.d("VIA_Sync: Attempting to delete marker file on Dropbox for: $audioPath")
-                // Dropbox uses the standard 'api' subdomain for metadata and file management operations
-                val apiService = Retrofit.Builder()
-                    .baseUrl("https://api.dropboxapi.com/")
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build()
-                    .create(ApiService::class.java)
 
                 val token = DropboxAuth.getValidToken(apiService)
                 if (token.isEmpty()) return@launch
@@ -1320,6 +1362,9 @@ class MainActivity : AppCompatActivity() {
                 if (response.isSuccessful) {
                     Timber.i("VIA_Sync: SUCCESS: Marker file successfully removed at $markerPath")
                 } else {
+                    if (response.code() == 401) {
+                        DropboxAuth.invalidateToken()
+                    }
                     val errorBody = response.errorBody()?.string()
                     Timber.e(
                         "VIA_Sync: Dropbox Rejected Marker Delete: HTTP ${response.code()} - $errorBody"
@@ -1389,6 +1434,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        connectMediaController()
+    }
+
+    private fun connectMediaController() {
+        // Release any stale future before creating a new one
+        controllerFuture?.let { MediaController.releaseFuture(it) }
 
         // Points to your PlaybackService
         val sessionToken = SessionToken(
@@ -1397,7 +1448,14 @@ class MainActivity : AppCompatActivity() {
         )
 
         // Asks the OS for the Remote Control
-        controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
+        controllerFuture = MediaController.Builder(this, sessionToken)
+            .setListener(object : MediaController.Listener {
+                override fun onDisconnected(controller: MediaController) {
+                    Timber.w("VIA_System: MediaController disconnected by OS.")
+                    mediaController = null
+                }
+            })
+            .buildAsync()
 
         // Waits for the connection to finish
         controllerFuture?.addListener({
@@ -1458,6 +1516,10 @@ class MainActivity : AppCompatActivity() {
                                 while (mediaController != null) {
                                     val player = mediaController ?: break
                                     if (player.isPlaying && player.duration > 0) {
+                                        if (currentAudioIndex !in audioQueue.indices) {
+                                            kotlinx.coroutines.delay(500)
+                                            continue
+                                        }
                                         val progress =
                                             player.currentPosition.toFloat() / player.duration
                                         val currentPath = audioQueue[currentAudioIndex].path
@@ -1520,6 +1582,7 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                         } else if (playbackState == Player.STATE_ENDED) {
+                            if (currentAudioIndex !in audioQueue.indices) return
                             val currentPath = audioQueue[currentAudioIndex].path
                             if (!prefs.getBoolean("heard_$currentPath", false)) {
                                 prefs.edit { putBoolean("heard_$currentPath", true) }
@@ -1556,16 +1619,24 @@ class MainActivity : AppCompatActivity() {
                             val adjustedPosition = if (rawPosition > 3000) rawPosition - 3000 else 0
                             mediaController?.seekTo(adjustedPosition)
 
-                            val audioPath = audioQueue[currentAudioIndex].path
-                            prefs.edit {
-                                putInt("last_pos_$audioPath", adjustedPosition.toInt())
-                                putInt("last_active_index", currentAudioIndex)
+                            if (currentAudioIndex in audioQueue.indices) {
+                                val audioPath = audioQueue[currentAudioIndex].path
+                                prefs.edit {
+                                    putInt("last_pos_$audioPath", adjustedPosition.toInt())
+                                    putInt("last_active_index", currentAudioIndex)
+                                }
                             }
                             keepScreenAwake(false)
                             if (wakeLock?.isHeld == true) wakeLock?.release()
                         }
                     }
                 })
+
+                // If the user pressed Play while disconnected, resume automatically now
+                if (pendingPlaybackAfterReconnect) {
+                    pendingPlaybackAfterReconnect = false
+                    startPlaybackWorkflow()
+                }
 
             } catch (e: Exception) {
                 Timber.e("VIA_System: Failed to bind MediaController: ${e.message}")
@@ -1581,28 +1652,22 @@ class MainActivity : AppCompatActivity() {
         // Check the clock here. This ensures it runs even if the app was just minimized.
         checkAndPlayDailyInstructions()
 
-        // Re-initializes Retrofit for the silent library scan
-        val retrofit = Retrofit.Builder()
-            .baseUrl("https://api.dropboxapi.com/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-        val apiService = retrofit.create(ApiService::class.java)
-
         // Call refreshLibrary (and notify user if new content exists, if need be)
         refreshLibrary(apiService, false) // false means manual sync
 
     }
 
     // Function that gets triggered automatically by Android the
-// exact moment the app is completely hidden from the user's screen.
+    // exact moment the app is completely hidden from the user's screen.
     override fun onStop() {
         Timber.d("VIA_System: onStop triggered. App sent to background.")
 
         // Let's go of the remote control so the Service can keep running in the background
         controllerFuture?.let { future ->
             MediaController.releaseFuture(future)
-            mediaController = null
         }
+        controllerFuture = null
+        mediaController = null
 
         super.onStop()
     }
@@ -1611,11 +1676,20 @@ class MainActivity : AppCompatActivity() {
 // Object that handles the permanent authentication with Dropbox
 object DropboxAuth {
     private var cachedToken: String? = null
+    private var tokenExpiresAt: Long = 0L
+    private const val TOKEN_LIFETIME_MS = 3 * 60 * 60 * 1000L // 3 hours (safe margin under Dropbox's 4h limit)
 
-    // Checks if there is a valid token, and fetches a new one if there isn't
+    fun invalidateToken() {
+        cachedToken = null
+        tokenExpiresAt = 0L
+        Timber.w("VIA_Auth: Cached token invalidated.")
+    }
+
+    // Checks if there is a valid, non-expired token, and fetches a new one if there isn't
     suspend fun getValidToken(apiService: ApiService): String {
-        // Returns the cached token if it already exists for this session
-        if (cachedToken != null) return "Bearer $cachedToken"
+        val now = System.currentTimeMillis()
+        // Returns the cached token if it already exists and hasn't expired
+        if (cachedToken != null && now < tokenExpiresAt) return "Bearer $cachedToken"
 
         return try {
             // Uses the permanent Refresh Token to get a fresh Access Token
@@ -1625,9 +1699,11 @@ object DropboxAuth {
                 clientSecret = BuildConfig.DROPBOX_CLIENT_SECRET
             )
             cachedToken = response.accessToken
+            tokenExpiresAt = System.currentTimeMillis() + TOKEN_LIFETIME_MS
             Timber.d("VIA_Auth: Access token successfully refreshed via Dropbox API")
             "Bearer $cachedToken"
         } catch (e: Exception) {
+            invalidateToken()
             Timber.e("VIA_Auth: CRITICAL: Token refresh failed: ${e.message}")
             ""
         }
